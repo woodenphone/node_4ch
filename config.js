@@ -1,0 +1,2 @@
+// Config
+dbPath = 'junk.db'
