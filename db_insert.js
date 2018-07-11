@@ -6,27 +6,43 @@ const sqlite3 = require('sqlite3');
 var db = new sqlite3.Database('junk.db');
 
 
-function processPost (threadNumber, post) {
+function insertPost (threadNumber, post) {
     // Put one post into the DB.
     //console.log(`Processing a post: ${post}`);
-    console.log('processPost() post =', post);
+    console.log('insertPost() post =', post);
     db.serialize( () => {
         var post_id = post.no;
         var thread_id = threadNumber;
         var comment = post.com;    
-        db.run('INSERT INTO posts (post_id, thread_id, comment) VALUES (?, ?, ?)',
-        post_id, thread_id, comment
+        db.run(
+            'INSERT INTO posts (post_id, thread_id, comment) VALUES (?, ?, ?) ',
+            post_id, thread_id, comment
         );
         console.log('Ran statement.');
     });
-};
+}
+
+
+function checkIfPostInDB (threadNumber, post) {
+    db.serialize( () => {
+        var post_id = post.no;
+        var thread_id = threadNumber; 
+        db.run('SELECT comment FROM posts WHERE post_id = ? AND thread_id = ?',
+            post_id, thread_id
+        ).each()
+        console.log('Ran statement.');
+        db.get()
+    });
+
+}
+
 
 function processThread(threadNumber, postArray) {
     console.log('processPost() postArray =', postArray);
     postArray.forEach(post => {
-        processPost (threadNumber, post);
+        insertPost(threadNumber, post);
     });
-};
+}
 
 const filePath = 'test_thread.json';
 const threadNumber = '66564526';
