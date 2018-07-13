@@ -2,7 +2,7 @@
 const fs = require('fs');
 const sqlite3 = require('sqlite3');
 const https = require('https');
-
+const async = require('async');
 
 
 
@@ -16,14 +16,63 @@ var threadNumber = '66694211'
 var threadURL = `${siteURL}/${boardName}/thread/${threadNumber}.json`
 
 
-handleThread (db, threadNumber)
+//handleThread (db, siteURL, boardName, threadNumber)
+handleBoardCatalog (db, siteURL, boardName)
+
+function sleep(ms){
+    return new Promise(resolve=>{
+        setTimeout(resolve,ms)
+    })
+}
 
 
+function parseCatalog(catalog) {
+    console.log('parseCatalog() boardName =', catalog)
+    // Join the pages
+    var threads = []
+    // for (var key in catalog) {
+    //     if (catalog.hasOwnProperty(key)) {
+    //         threads.push(catalog[key].threads)
+    //     }
+    // }
+    catalog.forEach( page => {
+        page.threads.forEach( thread => {
+            threads.push(thread)
+        })
+    })
+    console.log('parseCatalog() threads =', boardName)
+    return threads
+}
+
+function handleBoardCatalog (db, siteURL, boardName) {
+    console.log('handleBoardCatalog() boardName =', boardName)
+    // Get a list of threads
+    var catalogURL = `${siteURL}/${boardName}/catalog.json`
+    var body = ''
+    req = https.get(catalogURL, (res) => {
+        res.on('data', (chunk) => {
+            body += chunk
+        })
+        res.on('end', () => {
+            catalog = JSON.parse(body)
+            console.log('handleBoardCatalog() catalog =', catalog)
+            threads = parseCatalog(catalog)
+
+            // threads.forEach( (thread) => {
+            //     handleThread(db, siteURL, boardName, threadNumber=thread.no)
+            // })
+
+            // Handle just one thread until I figure out how to ratelimit
+            handleThread(db, siteURL, boardName, threadNumber=threads[2].no)
+        })
+    })
+    req.on('error', (err) => {
+        console.log('Error loading catalog', err)
+    })
+}
 
 
-
-
-function handleThread (db, threadNumber) {
+function handleThread (db, siteURL, boardName, threadNumber) {
     console.log('handleThread() threadNumber =', threadNumber)
     // Load and decode the thread API page
     var threadURL = `${siteURL}/${boardName}/thread/${threadNumber}.json`
@@ -38,6 +87,7 @@ function handleThread (db, threadNumber) {
             thread.posts.forEach( post => {
                 //console.log('handleThread() post =', post)
                 handlePost(db, threadNumber, post)
+                return
             })
         })
     })
@@ -61,7 +111,7 @@ function handlePost (db, threadNumber, post) {
         else {
             //console.log('row = ', row)
             if (row) {
-                console.log('Post already in DB')
+                console.log('Post already in DB. row = ', row)
             }
             else {
                 // For new posts...
@@ -77,7 +127,7 @@ function handlePost (db, threadNumber, post) {
             }
         }
     })
-    console.log('handlePost() end=')
+    console.log('handlePost() end')
     return
 }
 
