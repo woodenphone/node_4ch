@@ -1,3 +1,4 @@
 node_modules/
-*.json
+git_ignored/
+test_thread.json
 *.db

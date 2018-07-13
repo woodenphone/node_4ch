@@ -49,7 +49,8 @@ function handleThread (db, threadNumber) {
 function handlePost (db, threadNumber, post) {
     console.log('handlePost() post =', post)
     // Check if board, postID and threadID match a row in the DB, if so post has been processed already.
-    db.get('SELECT post_id, thread_id, comment FROM posts WHERE post_id = $post_id AND thread_id = $thread_id', {
+    db.get('SELECT post_id, thread_id, comment FROM posts '+ 
+        'WHERE post_id = $post_id AND thread_id = $thread_id', {
         $post_id: post.no,
         $thread_id: threadNumber
     }, (err, row) => {
@@ -90,8 +91,47 @@ function dbInsertPost (db, threadNumber, post) {
         var thread_id = threadNumber
         var comment = post.com;   
         db.run(
-            'INSERT INTO posts (post_id, thread_id, comment) VALUES (?, ?, ?) ',
-            post_id, thread_id, comment
+            'INSERT INTO posts (doc_id, '+
+            'media_id, poster_ip, num, subnum, thread_num, '+
+            'op, timestamp, timestamp_expired, preview_orig, '+
+            'preview_w, preview_h, media_filename, media_w, media_h, '+
+            'media_size, media_hash, media_orig, spoiler, deleted, '+
+            'capcode, email, name, trip, title, '+
+            'comment, delpass, sticky, locked, poster_hash, poster_country, exif) '+
+            'VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',{
+                $doc_id: NaN,// TODO: this should probably be autoincriment
+                $media_id: NaN,// TODO
+                $poster_ip: NaN,// TODO
+                $num: NaN,// TODO
+                $subnum: NaN,// TODO
+                $thread_num: NaN,// TODO
+                $op: NaN,// TODO ?derivve from post.resto?
+                $timestamp: NaN,// TODO ?time? 
+                $timestamp_expired: NaN,// TODO ?archived_on?
+                $preview_orig: NaN,// TODO
+                $preview_w: post.tn_w,
+                $preview_h: post.tn_h,
+                $media_filename: post.filename,
+                $media_w: post.w,
+                $media_h: post.h,
+                $media_size: post.fsize,
+                $media_hash: post.md5,
+                $media_orig: NaN,// TODO
+                $spoiler: post.spoiler,
+                $deleted: NaN,// TODO
+                $capcode: post.capcode,
+                $email: NaN,// TODO
+                $name: post.name,
+                $trip: post.trip,
+                $title: post.sub,
+                $comment: post.com,
+                $delpass: NaN,// TODO
+                $sticky: post.sticky,
+                $locked: post.closed,
+                $poster_hash: NaN,// TODO
+                $poster_country: NaN,// TODO
+                $exif: NaN,// TODO
+            }
         )
         console.log('Ran statement.');
     })
