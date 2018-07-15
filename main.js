@@ -137,9 +137,6 @@ function dbInsertPost (db, threadNumber, post) {
     //console.log(`Processing a post: ${post}`);
     console.log('dbInsertPost() post =', post)
     db.serialize( () => {
-        var post_id = post.no
-        var thread_id = threadNumber
-        var comment = post.com;   
         db.run(
             'INSERT INTO posts (doc_id, '+
             'media_id, poster_ip, num, subnum, thread_num, '+
@@ -152,20 +149,20 @@ function dbInsertPost (db, threadNumber, post) {
                 $doc_id: NaN,// TODO: this should probably be autoincriment
                 $media_id: NaN,// TODO
                 $poster_ip: NaN,// TODO
-                $num: NaN,// TODO
-                $subnum: NaN,// TODO
-                $thread_num: NaN,// TODO
-                $op: NaN,// TODO ?derivve from post.resto?
-                $timestamp: NaN,// TODO ?time? 
-                $timestamp_expired: NaN,// TODO ?archived_on?
+                $num: post.no,// Board-specific post ID number
+                $subnum: 0,// TODO
+                $thread_num: threadNumber,// Board-specific threadID number which is also the postID of the first post of the thread
+                $op: (post.num == threadNumber),// TODO ?derivve from post.resto?
+                $timestamp: post.time,// TODO ?time? 
+                $timestamp_expired: post.archived_on,// TODO ?archived_on?
                 $preview_orig: NaN,// TODO
-                $preview_w: post.tn_w,
-                $preview_h: post.tn_h,
+                $preview_w: post.tn_w,// TODO: Check if Asagi accepts the API value or calculates from the image
+                $preview_h: post.tn_h,// TODO: Check if Asagi accepts the API value or calculates from the image
                 $media_filename: post.filename,
-                $media_w: post.w,
-                $media_h: post.h,
-                $media_size: post.fsize,
-                $media_hash: post.md5,
+                $media_w: post.w,// TODO: Check if Asagi accepts the API value or calculates from the image
+                $media_h: post.h,// TODO: Check if Asagi accepts the API value or calculates from the image
+                $media_size: post.fsize,// TODO: Check if Asagi accepts the API value or calculates from the image
+                $media_hash: post.md5,// TODO: Check if Asagi accepts the API value or calculates from the image file
                 $media_orig: NaN,// TODO
                 $spoiler: post.spoiler,
                 $deleted: NaN,// TODO
@@ -176,8 +173,8 @@ function dbInsertPost (db, threadNumber, post) {
                 $title: post.sub,
                 $comment: post.com,
                 $delpass: NaN,// TODO
-                $sticky: post.sticky,
-                $locked: post.closed,
+                $sticky: post.sticky,// TODO: Check if asagi rechecks/retains this value somehow
+                $locked: post.closed,// TODO: Check if asagi rechecks/retains this value somehow
                 $poster_hash: NaN,// TODO
                 $poster_country: NaN,// TODO
                 $exif: NaN,// TODO
