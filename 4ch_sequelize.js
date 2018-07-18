@@ -79,32 +79,32 @@ const Thread = sequelize.define('thread', {
     },
     time_last: {
         type: Sequelize.INTEGER,
-        allowNull: false,
+        //allowNull: false,
     },
     time_bump: {
         type: Sequelize.INTEGER,
-        allowNull: false,
+        //allowNull: false,
     },
     time_ghost: {
         type: Sequelize.INTEGER,
-        allowNull: false,
+        //allowNull: false,
     },
     time_ghost_bump: {
         type: Sequelize.INTEGER,
-        allowNull: false,
+        //allowNull: false,
     },
     time_last_modified: {
         type: Sequelize.INTEGER,
-        allowNull: false,
+        //allowNull: false,
     },
     nreplies: {
         type: Sequelize.INTEGER,
-        allowNull: false,
+        //allowNull: false,
         defaultValue: 0,
     },
     nimages: {
         type: Sequelize.INTEGER,
-        allowNull: false,
+        //allowNull: false,
         defaultValue: 0,
     },
     sticky: {
@@ -160,6 +160,11 @@ const Post = sequelize.define('post', {
         allowNull: true,
         model: Image,// Foreign key
         key: 'id'// Foreign key
+    },
+    spoiler: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
     },
 });
 
@@ -217,20 +222,13 @@ console.log('postData', postData)
 
 
 
-// Insert a post
+// Create tables
 // force: true will drop the table if it already exists
-Post.sync({ force: false }).then(Image.sync({ force: false }))//then(Thread.sync({ force: false }))
-.then(handleThread());
+Post.sync({ force: false }).then(Image.sync({ force: false })).then(Thread.sync({ force: false }))
+// Insert a thread
+.then(handleThread(threadData));
 
-function handlePosts() {
-    console.log('Iterating over test thread:',threadData)
-    lupus(0, threadData.posts.length, (n) => {
-        console.log('processing post index:', n)
-        handlePost(threadData.posts[n])
-    }, () => {
-        console.log('finished lupus loop')
-    })
-}
+
 
 
 // Functions that check if a post is something
@@ -244,44 +242,66 @@ function isPostOP(postData,threadID){
     return (postData.no == threadID)
 }
 
-function isPostLocked(postData){
+function isPostLocked(postData) {
     return (postData.closed == 1)
+}
+
+function isPostSpoiler(postData) {
+    return (postData.spoiler == 1)
 }
 // /Functions that check if a post is something
 
 
 
 
-function handleThread (thread) {
+function handleThread (threadData) {
     // Extract thread-level data from OP
     var opPostData = threadData.posts[0]
-    return Thread.create({
-        threadNumber: opPostData.no,//TODO
-        time_op: opPostData.time,//TODO
-        time_last: null,//TODO
-        time_bump: null,//TODO
-        time_ghost: null,//TODO
-        time_ghost_bump: null,//TODO
-        time_last_modified: null,//TODO
-        nreplies: null,//TODO
-        nimages: null,//TODO
-        sticky: isPostSticky(opPostData),//TODO
-        locked: isPostLocked(opPostData)//TODO
-    }).then(
+    var threadID = opPostData.no
+    // Lookup threadID in the DB
+    return Thread.findOne({
+        where:  {
+            threadNumber: threadID,
+        }
+    }).then( (threadRow) => {
+        if (threadRow) {
+            console.log('Thread already in DB: ', threadID)
+        } else {
+            console.log('Creating entry for thread: ', threadID)
+            // Create entry for thread
+            Thread.create({
+                threadNumber: threadID,
+                time_op: opPostData.time,//TODO
+                time_last: null,//TODO
+                time_bump: threadData[-1].time,//TODO find better way of calculating this value
+                time_ghost: null,//TODO
+                time_ghost_bump: null,//TODO
+                time_last_modified: threadData[-1].time,//TODO Should be calculating by inspecting every post, and updating db to highest only if the highest is greater than the DB
+                nreplies: opPostData.replies,//TODO We should actually count the entries in the DB
+                nimages: opPostData.images,//TODO We should actually count the entries in the DB
+                sticky: isPostSticky(opPostData),//TODO
+                locked: isPostLocked(opPostData)//TODO
+            }).then( (threadRow) => {
+                console.log('Thread added to DB: ', threadRow)
+            })
+        }
+    }).then( () => {
         handlePosts()
-    )
+    })
 }
 
-
+function handlePosts() {
+    console.log('Iterating over test thread:',threadData)
+    lupus(0, threadData.posts.length, (n) => {
+        console.log('processing post index:', n)
+        handlePost(threadData.posts[n])
+    }, () => {
+        console.log('finished lupus loop')
+    })
+}
 
 function handlePost (postData) {
     console.log('handlePost() postData.no:', postData.no)
-    // Table created
-//     // Create entry for thread
-//     return Thread.create({
-//         threadNumber: threadID
-//     })
-// }).then(() => {
     // Does post exist in DB?
     Post.findOne({
         where:  {
@@ -307,7 +327,7 @@ function handlePost (postData) {
                         // If MD5 found, use that as our entry in media table
                         mediaID = imageRow.id
                         console.log('mediaID: ', mediaID)
-                        insertPostFinal (postData, threadID, mediaID)
+                        insertPostFinal(postData, threadID, mediaID)
                     } else {
                         console.log('Image is not in the DB')
                         // If no MD5 found, create new entry in media table and use that
@@ -320,7 +340,7 @@ function handlePost (postData) {
                             console.log('Image added to DB: ', imageRow)
                             mediaID = imageRow.id
                             console.log('mediaID: ', mediaID)
-                            insertPostFinal (postData, threadID, mediaID)
+                            insertPostFinal(postData, threadID, mediaID)
                         })
                     }
                 })
@@ -345,9 +365,11 @@ function insertPostFinal (postData, threadID, mediaID) {
         comment: postData.com,
         op: isPostOP(postData,threadID),
         timestamp: postData.time,
-        media_id: mediaID
-    }).then( (postCreateResult) =>{
-        console.log('postCreateResult ',postCreateResult)
+        media_id: mediaID,
+        spoiler: isPostSpoiler(postData),
+    }).then( (postCreatePostResult) =>{
+        // console.log('postCreatePostResult ',postCreatePostResult)
+        return
     })
 }
 
