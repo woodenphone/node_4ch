@@ -1,7 +1,7 @@
 // 4ch_sequelize.js
 // Save 4chan threads/posts/media using a DB
 const jsonFile = require('jsonfile')
-const fs = require('fs');
+const fs = require('fs-extra');
 const lupus = require('lupus');
 const Sequelize = require('sequelize');
 
@@ -360,13 +360,23 @@ function handlePost (postData) {
                     } else {
                         console.log('Image is not in the DB')
                         // If no MD5 found, create new entry in media table and use that
-                        // Fetch the media files
+
+                        // Fetch the media files for the post
+                        // Decide where to save each file
+                        var fullURL = `https://i.4cdn.org/${boardName}/${postdata.tim}.${postdata.ext}`
+                        var fullFilePath = `debug/${boardName}/${postdata.tim}.${postdata.ext}`
+                        var thumbURL = `https://i.4cdn.org/${boardName}/${postData.tim}s.jpg`
+                        var thumbFilePath = `debug/${boardName}/${postdata.tim}.${postdata.ext}`
+                        // Save full image
+                        downloadMedia(fullURL, fullFilePath)
+                        // Save thumb
+                        downloadMedia(thumbURL, thumbFilePath)
 
                         Image.create({
                             media_hash: postData.md5,
-                            media: 'local/path/to/media.ext',// TODO
+                            media: fullFilePath,// TODO Verify format Asagi uses
                             preview_op: 'local/path/to/preview_op.ext',// TODO
-                            preview_reply: 'local/path/to/preview_reply.ext',// TODO
+                            preview_reply: thumbFilePath,// TODO Verify format Asagi uses
                         }).then( (imageRow) => {
                             console.log('Image added to DB: ', imageRow)
                             mediaID = imageRow.id
@@ -385,22 +395,9 @@ function handlePost (postData) {
     })
 }
 
-function fetchPostMedia(boardName, postData) {
-    // Fetch the media files for the post
-    // Decide where to save each file
-    var fullURL = `https://i.4cdn.org/${boardName}/${postdata.tim}.${postdata.ext}`
-    var fullFilePath = `debug/${boardName}/${postdata.tim}.${postdata.ext}`
-    var thumbURL = `https://i.4cdn.org/${boardName}/${postData.tim}s.jpg`
-    var thumbFilePath = `debug/${boardName}/${postdata.tim}.${postdata.ext}`
-    // Save full image
-    downloadMedia(fullURL, fullFilePath)
-    // Save thumb
-    downloadMedia(thumbURL, filepath)
-
-}
-
 function downloadMedia(url, filepath) {
     console.log('Saving URL: ', url, 'to filepath: ',filepath)
+    return
     request
         .get(url)
         .on('error', function(err) {
@@ -422,6 +419,15 @@ function insertPostFinal (postData, threadID, mediaID) {
         timestamp: postData.time,
         media_id: mediaID,
         spoiler: isPostSpoiler(postData),
+        preview_orig: null,//TODO
+        preview_w: postData.tn_w,//TODO
+        preview_h: postData.tn_h,//TODO
+        media_filename: null,//TODO
+        media_w: postData.w,//TODO
+        media_h: postData.h,//TODO
+        media_size: postData.fsize,//TODO
+        media_hash: postData.md5,//TODO
+        media_orig: null,//TODO
     }).then( (postCreatePostResult) =>{
         // console.log('postCreatePostResult ',postCreatePostResult)
         return
