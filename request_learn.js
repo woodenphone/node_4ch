@@ -18,7 +18,10 @@ downladThreadImages(threadData)
 function downladThreadImages(threadData) {
   console.log('downladThreadImages() threadData', threadData)
   for (i in threadData.posts) {
+    console.log('i', i)
     console.log('threadData.posts[i]', threadData.posts[i])
+    var postData = threadData.posts[i]
+    console.log('postData', postData)
     limiter.removeTokens(1, () => {
       downloadPostImage(postData)
     })
@@ -29,7 +32,7 @@ function downladThreadImages(threadData) {
 
 
 function downloadPostImage(postData) {
-  // console.log('downloadPostImage() postData', postData)
+  console.log('downloadPostImage() postData', postData)
   // console.log('postData.filename', postData.filename)
   if (! postData.filename) {
     return
