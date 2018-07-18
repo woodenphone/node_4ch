@@ -166,19 +166,48 @@ const Post = sequelize.define('post', {
         allowNull: false,
         defaultValue: false
     },
+    preview_orig: {
+        type: Sequelize.TEXT
+    },
+    preview_w: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        defaultValue: 0
+    },
+    preview_h: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        defaultValue: 0
+    },
+    media_filename: {
+        type: Sequelize.TEXT
+    },
+    media_w: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        defaultValue: 0
+    },
+    media_h: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        defaultValue: 0
+    },
+    media_size: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        defaultValue: 0
+    },
+    media_hash: {
+        type: Sequelize.TEXT
+    },
+    media_orig: {
+        type: Sequelize.TEXT
+    },
 });
 
 
 
-// Get a whole thread for testing
-// var threadData = JSON.parse(fs.readFileSync('git_ignored\\test_thread.json', 'utf8'));
 
-// var threadData;
-// fs.readFile('git_ignored\\test_thread.json', 'utf8', function (err, data) {
-//   if (err) throw err;
-//   threadData = JSON.parse(data);
-//   console.log('threadData', threadData)
-// });
 var threadData = jsonFile.readFileSync('git_ignored\\test_thread.json');
 
 console.log('threadData', threadData)
@@ -279,8 +308,8 @@ function handleThread (threadData) {
                 time_last_modified: threadData[-1].time,//TODO Should be calculating by inspecting every post, and updating db to highest only if the highest is greater than the DB
                 nreplies: opPostData.replies,//TODO We should actually count the entries in the DB
                 nimages: opPostData.images,//TODO We should actually count the entries in the DB
-                sticky: isPostSticky(opPostData),//TODO
-                locked: isPostLocked(opPostData)//TODO
+                sticky: isPostSticky(opPostData),
+                locked: isPostLocked(opPostData),
             }).then( (threadRow) => {
                 console.log('Thread added to DB: ', threadRow)
             })
@@ -331,6 +360,8 @@ function handlePost (postData) {
                     } else {
                         console.log('Image is not in the DB')
                         // If no MD5 found, create new entry in media table and use that
+                        // Fetch the media files
+
                         Image.create({
                             media_hash: postData.md5,
                             media: 'local/path/to/media.ext',// TODO
@@ -352,6 +383,30 @@ function handlePost (postData) {
             }
         }
     })
+}
+
+function fetchPostMedia(boardName, postData) {
+    // Fetch the media files for the post
+    // Decide where to save each file
+    var fullURL = `https://i.4cdn.org/${boardName}/${postdata.tim}.${postdata.ext}`
+    var fullFilePath = `debug/${boardName}/${postdata.tim}.${postdata.ext}`
+    var thumbURL = `https://i.4cdn.org/${boardName}/${postData.tim}s.jpg`
+    var thumbFilePath = `debug/${boardName}/${postdata.tim}.${postdata.ext}`
+    // Save full image
+    downloadMedia(fullURL, fullFilePath)
+    // Save thumb
+    downloadMedia(thumbURL, filepath)
+
+}
+
+function downloadMedia(url, filepath) {
+    console.log('Saving URL: ', url, 'to filepath: ',filepath)
+    request
+        .get(url)
+        .on('error', function(err) {
+            console.log(err)
+            raise(err)
+        }).pipe(fs.createWriteStream(filepath))
 }
 
 function insertPostFinal (postData, threadID, mediaID) {
