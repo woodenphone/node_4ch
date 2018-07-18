@@ -363,10 +363,10 @@ function handlePost (postData) {
 
                         // Fetch the media files for the post
                         // Decide where to save each file
-                        var fullURL = `https://i.4cdn.org/${boardName}/${postdata.tim}.${postdata.ext}`
-                        var fullFilePath = `debug/${boardName}/${postdata.tim}.${postdata.ext}`
-                        var thumbURL = `https://i.4cdn.org/${boardName}/${postData.tim}s.jpg`
-                        var thumbFilePath = `debug/${boardName}/${postdata.tim}.${postdata.ext}`
+                        var fullURL = `https://i.4cdn.org/${boardName}/${postdata.tim}${postdata.ext}`
+                        var fullFilePath = `debug/${boardName}/${postdata.tim}${postdata.ext}`
+                        var thumbURL = `https://i.4cdn.org/${boardName}/${postData.tim}sjpg`
+                        var thumbFilePath = `debug/${boardName}/${postdata.tim}${postdata.ext}`
                         // Save full image
                         downloadMedia(fullURL, fullFilePath)
                         // Save thumb

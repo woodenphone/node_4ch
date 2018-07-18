@@ -4,8 +4,8 @@ const request = require('request')
 const jsonFile = require('jsonfile')
 const fs = require('fs-extra');
 const lupus = require('lupus');
-//var RateLimiter = require('limiter').RateLimiter;
-//var limiter = new RateLimiter(1, 10);
+var RateLimiter = require('limiter').RateLimiter;
+var limiter = new RateLimiter(1, 100);
 
 var threadData = jsonFile.readFileSync('git_ignored\\test_thread.json');
 
@@ -20,7 +20,9 @@ function downladThreadImages(posts) {
   for (let i = 0; i< posts.length; i++){
     const post = posts[i];
     // console.log('post', post)
-    downloadPostImage(post)
+    limiter.removeTokens(1, function() {
+      downloadPostImage(post)
+    })
   }
 }
 
@@ -30,6 +32,7 @@ function downladThreadImages(posts) {
 function downloadPostImage(postData) {
   // console.log('downloadPostImage() postData', postData)
   // console.log('postData.filename', postData.filename)
+  // Image posts will have a filename
   if (! postData.filename) {
     return
   } else {
