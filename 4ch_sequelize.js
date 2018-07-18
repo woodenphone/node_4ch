@@ -1,4 +1,8 @@
 // 4ch_sequelize.js
+// Save 4chan threads/posts/media using a DB
+const jsonFile = require('jsonfile')
+const fs = require('fs');
+const lupus = require('lupus');
 const Sequelize = require('sequelize');
 
 // Connect to the DB
@@ -30,6 +34,37 @@ sequelize
     });
 
 
+// Define media columns
+const Image = sequelize.define('image', {
+    // media_id: {
+    //     type: Sequelize.INTEGER,
+    //     allowNull: false,
+    //     autoIncrement: true,
+    //     unique: 'media_id_Unique_Index'
+    // },
+    media_hash: {
+        type: Sequelize.TEXT,
+        allowNull: false,
+    },
+    media: {
+        type: Sequelize.TEXT
+    },
+    preview_op: {
+        type: Sequelize.TEXT
+    },
+    preview_reply: {
+        type: Sequelize.TEXT
+    },
+    total: {
+        type: Sequelize.INTEGER,
+        //allowNull: false,
+    },
+    banned: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+    },
+});
 
 // Define thread columns
 const Thread = sequelize.define('thread', {
@@ -38,17 +73,63 @@ const Thread = sequelize.define('thread', {
         allowNull: false,
         unique: 'ThreadNumberUniqueIndex'
     },
+    time_op: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+    },
+    time_last: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+    },
+    time_bump: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+    },
+    time_ghost: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+    },
+    time_ghost_bump: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+    },
+    time_last_modified: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+    },
+    nreplies: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+    },
+    nimages: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+    },
+    sticky: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+    },
+    locked: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+    },
 });
 
 // Define post columns
 const Post = sequelize.define('post', {
     postNumber: {
         type: Sequelize.INTEGER,
-        allowNull: false
+        allowNull: false,
     },
-    threadNumber: {
+    thread_num: {
         type: Sequelize.INTEGER,
-        allowNull: false
+        allowNull: false,
+        // model: Thread,// Foreign key
+        // key: 'threadNumber'// Foreign key
     },
     name: {
         type: Sequelize.TEXT
@@ -67,55 +148,243 @@ const Post = sequelize.define('post', {
         allowNull: false,
         defaultValue: false
     },
-    timeStamp: {
+    timestamp: {
         type: Sequelize.INTEGER,
         allowNull: false
-    }
+    },
+    timestamp_expired: {
+        type: Sequelize.INTEGER,
+    },
+    media_id: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+        model: Image,// Foreign key
+        key: 'id'// Foreign key
+    },
 });
 
 
 
-// A post for testing
-threadID = 66564526
-postData = {
-    "no":66564526,
-    "closed":1,
-    "now":"07\/01\/18(Sun)00:45:53",
-    "name":"Anonymous",
-    "sub":"\/dpt\/ - Daily Programming Thread",
-    "com":"old thread: <a href=\"\/g\/thread\/66555693#p66555693\" class=\"quotelink\">&gt;&gt;66555693<\/a><br><br>What are you working on, \/g\/?",
-    "filename":"i brought programmer!",
-    "ext":".png",
-    "w":1280,
-    "h":720,
-    "tn_w":250,
-    "tn_h":140,
-    "tim":1530420353413,
-    "time":1530420353,
-    "md5":"rC2BsoSAoLbE8UiQN8uBjw==",
-    "fsize":745037,
-    "resto":0,
-    "archived":1,
-    "bumplimit":1,
-    "archived_on":1530484735,
-    "imagelimit":0,
-    "semantic_url":"dpt-daily-programming-thread",
-    "replies":375,
-    "images":29,
-    "tail_size":50
-}
+// Get a whole thread for testing
+// var threadData = JSON.parse(fs.readFileSync('git_ignored\\test_thread.json', 'utf8'));
+
+// var threadData;
+// fs.readFile('git_ignored\\test_thread.json', 'utf8', function (err, data) {
+//   if (err) throw err;
+//   threadData = JSON.parse(data);
+//   console.log('threadData', threadData)
+// });
+var threadData = jsonFile.readFileSync('git_ignored\\test_thread.json');
+
+console.log('threadData', threadData)
+
+var threadID = threadData.posts[0].no// TODO Find safer way to generate threadID
+var postData = threadData.posts[0]
+console.log('postData', postData)
+
+
+
+// // A post for testing
+// threadID = 66564526
+// postData = {
+//     "no":66564526,
+//     "closed":1,
+//     "now":"07\/01\/18(Sun)00:45:53",
+//     "name":"Anonymous",
+//     "sub":"\/dpt\/ - Daily Programming Thread",
+//     "com":"old thread: <a href=\"\/g\/thread\/66555693#p66555693\" class=\"quotelink\">&gt;&gt;66555693<\/a><br><br>What are you working on, \/g\/?",
+//     "filename":"i brought programmer!",
+//     "ext":".png",
+//     "w":1280,
+//     "h":720,
+//     "tn_w":250,
+//     "tn_h":140,
+//     "tim":1530420353413,
+//     "time":1530420353,
+//     "md5":"rC2BsoSAoLbE8UiQN8uBjw==",
+//     "fsize":745037,
+//     "resto":0,
+//     "archived":1,
+//     "bumplimit":1,
+//     "archived_on":1530484735,
+//     "imagelimit":0,
+//     "semantic_url":"dpt-daily-programming-thread",
+//     "replies":375,
+//     "images":29,
+//     "tail_size":50
+// }
+
+
+
 
 // Insert a post
 // force: true will drop the table if it already exists
-Post.sync({ force: true }).then(() => {
+Post.sync({ force: false }).then(Image.sync({ force: false }))//then(Thread.sync({ force: false }))
+.then(handleThread());
+
+function handlePosts() {
+    console.log('Iterating over test thread:',threadData)
+    lupus(0, threadData.posts.length, (n) => {
+        console.log('processing post index:', n)
+        handlePost(threadData.posts[n])
+    }, () => {
+        console.log('finished lupus loop')
+    })
+}
+
+
+// Functions that check if a post is something
+function isPostSticky(postData) {
+    //Non-sticky posts will lack 'sticky' key or have it set to false
+    // Sticky posts will have post.sticky === 1
+    return (postData.sticky == 1)
+}
+
+function isPostOP(postData,threadID){
+    return (postData.no == threadID)
+}
+
+function isPostLocked(postData){
+    return (postData.closed == 1)
+}
+// /Functions that check if a post is something
+
+
+
+
+function handleThread (thread) {
+    // Extract thread-level data from OP
+    var opPostData = threadData.posts[0]
+    return Thread.create({
+        threadNumber: opPostData.no,//TODO
+        time_op: opPostData.time,//TODO
+        time_last: null,//TODO
+        time_bump: null,//TODO
+        time_ghost: null,//TODO
+        time_ghost_bump: null,//TODO
+        time_last_modified: null,//TODO
+        nreplies: null,//TODO
+        nimages: null,//TODO
+        sticky: isPostSticky(opPostData),//TODO
+        locked: isPostLocked(opPostData)//TODO
+    }).then(
+        handlePosts()
+    )
+}
+
+
+
+function handlePost (postData) {
+    console.log('handlePost() postData.no:', postData.no)
     // Table created
+//     // Create entry for thread
+//     return Thread.create({
+//         threadNumber: threadID
+//     })
+// }).then(() => {
+    // Does post exist in DB?
+    Post.findOne({
+        where:  {
+            postNumber: postData.no,
+            thread_num: threadID,
+        }
+    }).then( (existingVersionOfPost) => {
+        console.log('postTest existingVersionOfPost', existingVersionOfPost)
+        if (existingVersionOfPost) {
+            console.log('Post is already in the DB')
+        } else {
+            console.log('Post is not in the DB')
+            // If post has a file ?post.md5 !== ''?
+            if (postData.md5) {
+                console.log('Post has an image')
+                // Lookup MD5 in DB
+                Image.findOne({
+                    where:{media_hash: postData.md5}
+                }).then( (existingVersionOfImageRow) => {
+                    console.log('imgTest existingVersionOfImageRow', existingVersionOfImageRow)
+                    if (existingVersionOfImageRow) {
+                        console.log('Image is already in the DB')
+                        // If MD5 found, use that as our entry in media table
+                        mediaID = imageRow.id
+                        console.log('mediaID: ', mediaID)
+                        insertPostFinal (postData, threadID, mediaID)
+                    } else {
+                        console.log('Image is not in the DB')
+                        // If no MD5 found, create new entry in media table and use that
+                        Image.create({
+                            media_hash: postData.md5,
+                            media: 'local/path/to/media.ext',// TODO
+                            preview_op: 'local/path/to/preview_op.ext',// TODO
+                            preview_reply: 'local/path/to/preview_reply.ext',// TODO
+                        }).then( (imageRow) => {
+                            console.log('Image added to DB: ', imageRow)
+                            mediaID = imageRow.id
+                            console.log('mediaID: ', mediaID)
+                            insertPostFinal (postData, threadID, mediaID)
+                        })
+                    }
+                })
+            } else {
+                console.log('Post has no image')
+                mediaID = null// We don't have media for this post, so use null
+                console.log('mediaID: ', mediaID)
+                insertPostFinal (postData, threadID, mediaID)
+            }
+        }
+    })
+}
+
+function insertPostFinal (postData, threadID, mediaID) {
+    // Insert the post's data
+    console.log('Inserting post data')
     return Post.create({
         postNumber: postData.no,
-        threadNumber: threadID,
+        thread_num: threadID,
         name: postData.name,
         title: postData.sub,
         comment: postData.com,
-        op: (postData.no == threadID),
-        timeStamp: postData.tim
-    });
-});
+        op: isPostOP(postData,threadID),
+        timestamp: postData.time,
+        media_id: mediaID
+    }).then( (postCreateResult) =>{
+        console.log('postCreateResult ',postCreateResult)
+    })
+}
+
+// Insert a post with media
+// function insertPostWithMedia(post, threadID) {
+    
+// Given post, threadID
+// Have we already saved this post?
+// existing_p = Post.findOne({
+//     where: {
+//         postNumber:postData.no,
+//         thread_num: threadID,
+// }})
+// console.log(existing_p)
+
+// If MD5 found, use that as our entry in media table
+// If no MD5 found, create new entry in media table and use that
+
+    // return sequelize.transaction(function (t) {
+    //     // chain all your queries here. make sure you return them.
+    //     return User.create({
+    //       firstName: 'Abraham',
+    //       lastName: 'Lincoln'
+    //     }, {transaction: t}).then(function (user) {
+    //       return user.setShooter({
+    //         firstName: 'John',
+    //         lastName: 'Boothe'
+    //       }, {transaction: t});
+    //     });
+      
+    //   }).then(function (result) {
+    //     // Transaction has been committed
+    //     // result is whatever the result of the promise chain returned to the transaction callback
+    //     console.log('transaction succeeded', result)
+    //   }).catch(function (err) {
+    //     // Transaction has been rolled back
+    //     // err is whatever rejected the promise chain returned to the transaction callback
+    //     console.log('transaction failed', err)
+    //   });
+
