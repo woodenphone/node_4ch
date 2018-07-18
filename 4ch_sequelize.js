@@ -6,7 +6,7 @@ const lupus = require('lupus');
 const Sequelize = require('sequelize');
 const rp = require('request-promise')
 var RateLimiter = require('limiter').RateLimiter;
-var limiter = new RateLimiter(1, 3000);
+var limiter = new RateLimiter(1, 10000);
 
 // Connect to the DB
 const sequelize = new Sequelize('database', 'username', 'password', {
@@ -213,7 +213,7 @@ const Post = sequelize.define('post', {
 
 const siteURL = 'https://a.4cdn.org'
 const boardName = 'g'
-const threadID = '66785633'
+const threadID = '66787680'
 
 
 var testThreadData = jsonFile.readFileSync('git_ignored\\test_thread.json');
@@ -393,8 +393,8 @@ function handlePostData (postData, threadID) {
                         // Decide where to save each file
                         var fullURL = `https://i.4cdn.org/${boardName}/${postData.tim}${postData.ext}`
                         var fullFilePath = `debug/${boardName}/${postData.tim}${postData.ext}`
-                        var thumbURL = `https://i.4cdn.org/${boardName}/${postData.tim}sjpg`
-                        var thumbFilePath = `debug/${boardName}/${postData.tim}${postData.ext}`
+                        var thumbURL = `https://i.4cdn.org/${boardName}/${postData.tim}s${postData.ext}`
+                        var thumbFilePath = `debug/${boardName}/${postData.tim}s${postData.ext}`
                         // Save full image
                         downloadMedia(fullURL, fullFilePath)
                         // Save thumb
