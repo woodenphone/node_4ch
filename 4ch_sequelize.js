@@ -206,7 +206,7 @@ const Post = sequelize.define('post', {
 });
 
 
-
+const boardName = 'g'
 
 var threadData = jsonFile.readFileSync('git_ignored\\test_thread.json');
 
