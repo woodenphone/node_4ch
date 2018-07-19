@@ -1,234 +1,37 @@
 // 4ch_sequelize.js
 // Save 4chan threads/posts/media using a DB
+// Library imports
 const jsonFile = require('jsonfile')
 const fs = require('fs-extra');
 const lupus = require('lupus');
 const Sequelize = require('sequelize');
 const rp = require('request-promise')
+var rp_errors = require('request-promise/errors');
 var RateLimiter = require('limiter').RateLimiter;
 var limiter = new RateLimiter(1, 1000);
-var logger = require('tracer').colorConsole({level:'debug'});
-// const winston = require('winston')
-// winston.level = 'debug'
 
-// const logger = winston.createLogger({
-//     transports: [
-//       new winston.transports.Console(),
-//       new winston.transports.File({ filename: 'debug/combined.log' })
-//     ],
-//     exceptionHandlers: [
-//         new winston.transports.File({ filename: 'debug/exceptions.log' })
-//     ]
-//   });
-
-
-  
-// Connect to the DB
-const sequelize = new Sequelize('database', 'username', 'password', {
-    host: 'localhost',
-    dialect: 'sqlite',
-  
-    pool: {
-      max: 5,
-      min: 0,
-      acquire: 30000,
-      idle: 10000
-    },
-  
-    // SQLite only
-    storage: 'junk_sequelize.sqlite',
-  
-    // http://docs.sequelizejs.com/manual/tutorial/querying.html#operators
-    operatorsAliases: false
-  });
-
-sequelize
-    .authenticate()
-    .then(() => {
-        console.log('Connection has been established successfully.');
-    })
-    .catch(err => {
-        console.error('Unable to connect to the database:', err);
-    });
-
-
-// Define media columns
-const Image = sequelize.define('image', {
-    // media_id: {
-    //     type: Sequelize.INTEGER,
-    //     allowNull: false,
-    //     autoIncrement: true,
-    //     unique: 'media_id_Unique_Index'
-    // },
-    media_hash: {
-        type: Sequelize.TEXT,
-        allowNull: false,
-    },
-    media: {
-        type: Sequelize.TEXT
-    },
-    preview_op: {
-        type: Sequelize.TEXT
-    },
-    preview_reply: {
-        type: Sequelize.TEXT
-    },
-    total: {
-        type: Sequelize.INTEGER,
-        //allowNull: false,
-    },
-    banned: {
-        type: Sequelize.BOOLEAN,
-        allowNull: false,
-        defaultValue: false,
+// Setup logging
+const tracer = require('tracer')
+var logger = tracer.colorConsole({
+	transport : function(data) {
+		console.log(data.output);
+		fs.appendFile('./debug/4ch_sequelize.log', data.rawoutput + '\n', (err) => {
+			if (err) throw err;
+		});
     },
 });
+tracer.setLevel('debug')
+logger.info('Logging started.')
 
-// Define thread columns
-const Thread = sequelize.define('thread', {
-    threadNumber: {
-        type: Sequelize.INTEGER,
-        allowNull: false,
-        unique: 'ThreadNumberUniqueIndex'
-    },
-    time_op: {
-        type: Sequelize.INTEGER,
-        allowNull: false,
-    },
-    time_last: {
-        type: Sequelize.INTEGER,
-        //allowNull: false,
-    },
-    time_bump: {
-        type: Sequelize.INTEGER,
-        //allowNull: false,
-    },
-    time_ghost: {
-        type: Sequelize.INTEGER,
-        //allowNull: false,
-    },
-    time_ghost_bump: {
-        type: Sequelize.INTEGER,
-        //allowNull: false,
-    },
-    time_last_modified: {
-        type: Sequelize.INTEGER,
-        //allowNull: false,
-    },
-    nreplies: {
-        type: Sequelize.INTEGER,
-        //allowNull: false,
-        defaultValue: 0,
-    },
-    nimages: {
-        type: Sequelize.INTEGER,
-        //allowNull: false,
-        defaultValue: 0,
-    },
-    sticky: {
-        type: Sequelize.BOOLEAN,
-        allowNull: false,
-        defaultValue: false,
-    },
-    locked: {
-        type: Sequelize.BOOLEAN,
-        allowNull: false,
-        defaultValue: false,
-    },
-});
-
-// Define post columns
-const Post = sequelize.define('post', {
-    postNumber: {
-        type: Sequelize.INTEGER,
-        allowNull: false,
-    },
-    thread_num: {
-        type: Sequelize.INTEGER,
-        allowNull: false,
-        // model: Thread,// Foreign key
-        // key: 'threadNumber'// Foreign key
-    },
-    name: {
-        type: Sequelize.TEXT
-    },
-    trip: {
-        type: Sequelize.TEXT
-    },
-    title: {
-        type: Sequelize.TEXT
-    },
-    comment: {
-        type: Sequelize.TEXT
-    },
-    op: {
-        type: Sequelize.BOOLEAN,
-        allowNull: false,
-        defaultValue: false
-    },
-    timestamp: {
-        type: Sequelize.INTEGER,
-        allowNull: false
-    },
-    timestamp_expired: {
-        type: Sequelize.INTEGER,
-    },
-    media_id: {
-        type: Sequelize.INTEGER,
-        allowNull: true,
-        model: Image,// Foreign key
-        key: 'id'// Foreign key
-    },
-    spoiler: {
-        type: Sequelize.BOOLEAN,
-        allowNull: false,
-        defaultValue: false
-    },
-    preview_orig: {
-        type: Sequelize.TEXT
-    },
-    preview_w: {
-        type: Sequelize.INTEGER,
-        allowNull: false,
-        defaultValue: 0
-    },
-    preview_h: {
-        type: Sequelize.INTEGER,
-        allowNull: false,
-        defaultValue: 0
-    },
-    media_filename: {
-        type: Sequelize.TEXT
-    },
-    media_w: {
-        type: Sequelize.INTEGER,
-        allowNull: false,
-        defaultValue: 0
-    },
-    media_h: {
-        type: Sequelize.INTEGER,
-        allowNull: false,
-        defaultValue: 0
-    },
-    media_size: {
-        type: Sequelize.INTEGER,
-        allowNull: false,
-        defaultValue: 0
-    },
-    media_hash: {
-        type: Sequelize.TEXT
-    },
-    media_orig: {
-        type: Sequelize.TEXT
-    },
-});
-
+// Local imports
+const db = require('./4ch_sequelize_database.js')// DB schema and setup
+  
 
 
 
 const siteURL = 'https://a.4cdn.org'
 const boardName = 'g'
-const threadID = '66790292'
+const threadID = '66770725'
 
 
 // var testThreadData = jsonFile.readFileSync('git_ignored\\test_thread.json');
@@ -274,7 +77,7 @@ const threadID = '66790292'
 
 // Create tables
 // force: true will drop the table if it already exists
-Post.sync({ force: false }).then(Image.sync({ force: false })).then(Thread.sync({ force: false }))
+db.Post.sync({ force: false }).then(db.Image.sync({ force: false })).then(db.Thread.sync({ force: false }))
 // Insert a thread
 // .then(handleThreadData(testThreadData));
 // .then(handlePostData(testPostData));
@@ -324,10 +127,10 @@ function handleThread(siteURL, boardName, threadID) {
     // Load thread API URL
     rp(threadURL)
     .then( (htmlString) => {
-    // Decode JSON
-    threadData = JSON.parse(htmlString)
-    // Process thread data
-    handleThreadData (threadData)
+        // Decode JSON
+        threadData = JSON.parse(htmlString)
+        // Process thread data
+        handleThreadData (threadData)
     })
 }
 
@@ -336,7 +139,7 @@ function handleThreadData (threadData) {
     var opPostData = threadData.posts[0]
     var threadID = opPostData.no
     // Lookup threadID in the DB
-    return Thread.findOne({
+    return db.Thread.findOne({
         where:  {
             threadNumber: threadID,
         }
@@ -346,7 +149,7 @@ function handleThreadData (threadData) {
         } else {
             logger.debug('Creating entry for thread: ', threadID)
             // Create entry for thread
-            Thread.create({
+            db.Thread.create({
                 threadNumber: threadID,
                 time_op: opPostData.time,//TODO
                 time_last: getThreadTimeLast(threadData),//TODO
@@ -381,7 +184,7 @@ function iterateThreadPosts(threadData, threadID) {
 function handlePostData (postData, threadID) {
     logger.debug('handlePostData() postData.no:', postData.no)
     // Does post exist in DB?
-    Post.findOne({
+    db.Post.findOne({
         where:  {
             postNumber: postData.no,
             thread_num: threadID,
@@ -396,7 +199,7 @@ function handlePostData (postData, threadID) {
             if (postData.md5) {
                 logger.debug(`Post ${postData.no} has an image`)
                 // Lookup MD5 in DB
-                Image.findOne({
+                db.Image.findOne({
                     where:{media_hash: postData.md5}
                 }).then( (existingVersionOfImageRow) => {
                     logger.trace('imgTest existingVersionOfImageRow', existingVersionOfImageRow)
@@ -420,7 +223,7 @@ function handlePostData (postData, threadID) {
                         // Save thumb
                         downloadMedia(thumbURL, thumbFilePath)
                         // Insert row into Images table
-                        Image.create({
+                        db.Image.create({
                             media_hash: postData.md5,
                             media: fullFilePath,// TODO Verify format Asagi uses
                             preview_op: 'local/path/to/preview_op.ext',// TODO
@@ -449,18 +252,36 @@ function downloadMedia(url, filepath) {
         logger.trace('Limiter fired.')
         // return
         rp.get(url)
-            .on('error', function(err) {
-                logger.error('downloadMedia() err', err)
-                console.log('downloadMedia() err ',err)
-                raise(err)
-            }).pipe(fs.createWriteStream(filepath))
+        .catch(rp_errors.StatusCodeError, function (reason) {
+            logger.error('downloadMedia() caught StatusCodeError', reason)
+            // The server responded with a status codes other than 2xx.
+            // Check reason.statusCode
+            if (reason.statusCode == 404) {
+                //TODO Handle 404
+            }
+        // }).on('error', function(err) {
+        //     logger.error('downloadMedia() err', err)
+        //     console.log('downloadMedia() err ',err)
+        //     raise(err)
+        // }).pipe(fs.createWriteStream(filepath))
+        }).then( (data) => {
+            // Save data to disk
+            fs.writeFile(filepath, data, (err) => {
+                if(err) {
+                    logger.error(err);
+                    //TODO Retry
+                } else {
+                    // TODO handle success
+                }
+            })
+        })
     })
 }
 
 function insertPostFinal (postData, threadID, mediaID) {
     // Insert the post's data
     logger.debug('Inserting post data')
-    return Post.create({
+    return db.Post.create({
         postNumber: postData.no,
         thread_num: threadID,
         name: postData.name,
@@ -485,40 +306,4 @@ function insertPostFinal (postData, threadID, mediaID) {
     })
 }
 
-// Insert a post with media
-// function insertPostWithMedia(post, threadID) {
-    
-// Given post, threadID
-// Have we already saved this post?
-// existing_p = Post.findOne({
-//     where: {
-//         postNumber:postData.no,
-//         thread_num: threadID,
-// }})
-// console.log(existing_p)
-
-// If MD5 found, use that as our entry in media table
-// If no MD5 found, create new entry in media table and use that
-
-    // return sequelize.transaction(function (t) {
-    //     // chain all your queries here. make sure you return them.
-    //     return User.create({
-    //       firstName: 'Abraham',
-    //       lastName: 'Lincoln'
-    //     }, {transaction: t}).then(function (user) {
-    //       return user.setShooter({
-    //         firstName: 'John',
-    //         lastName: 'Boothe'
-    //       }, {transaction: t});
-    //     });
-      
-    //   }).then(function (result) {
-    //     // Transaction has been committed
-    //     // result is whatever the result of the promise chain returned to the transaction callback
-    //     console.log('transaction succeeded', result)
-    //   }).catch(function (err) {
-    //     // Transaction has been rolled back
-    //     // err is whatever rejected the promise chain returned to the transaction callback
-    //     console.log('transaction failed', err)
-    //   });
 
