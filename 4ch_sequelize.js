@@ -6,19 +6,20 @@ const lupus = require('lupus');
 const Sequelize = require('sequelize');
 const rp = require('request-promise')
 var RateLimiter = require('limiter').RateLimiter;
-var limiter = new RateLimiter(1, 10000);
-const winston = require('winston')
-winston.level = 'debug'
+var limiter = new RateLimiter(1, 1000);
+var logger = require('tracer').colorConsole({level:'debug'});
+// const winston = require('winston')
+// winston.level = 'debug'
 
-const logger = winston.createLogger({
-    transports: [
-      new winston.transports.Console(),
-      new winston.transports.File({ filename: 'debug/combined.log' })
-    ],
-    exceptionHandlers: [
-        new winston.transports.File({ filename: 'debug/exceptions.log' })
-    ]
-  });
+// const logger = winston.createLogger({
+//     transports: [
+//       new winston.transports.Console(),
+//       new winston.transports.File({ filename: 'debug/combined.log' })
+//     ],
+//     exceptionHandlers: [
+//         new winston.transports.File({ filename: 'debug/exceptions.log' })
+//     ]
+//   });
 
 
   
@@ -227,7 +228,7 @@ const Post = sequelize.define('post', {
 
 const siteURL = 'https://a.4cdn.org'
 const boardName = 'g'
-const threadID = '66793151'
+const threadID = '66790292'
 
 
 // var testThreadData = jsonFile.readFileSync('git_ignored\\test_thread.json');
@@ -358,7 +359,7 @@ function handleThreadData (threadData) {
                 sticky: isPostSticky(opPostData),
                 locked: isPostLocked(opPostData),
             }).then( (threadRow) => {
-                logger.debug('Thread added to DB: ', threadRow)
+                logger.trace('Thread added to DB: ', threadRow)
             })
         }
     }).then( () => {
@@ -367,13 +368,13 @@ function handleThreadData (threadData) {
 }
 
 function iterateThreadPosts(threadData, threadID) {
-    logger.debug('Iterating over test thread:',threadData)
+    logger.trace('Iterating over test thread:',threadData)
     lupus(0, threadData.posts.length, (n) => {
-        logger.debug('processing post index:', n)
+        logger.trace('processing post index:', n)
         var postData = threadData.posts[n]
         handlePostData(postData, threadID)
     }, () => {
-        logger.debug('finished lupus loop')
+        logger.trace('finished lupus loop')
     })
 }
 
@@ -386,7 +387,7 @@ function handlePostData (postData, threadID) {
             thread_num: threadID,
         }
     }).then( (existingVersionOfPost) => {
-        logger.debug('postTest existingVersionOfPost', existingVersionOfPost)
+        logger.trace('postTest existingVersionOfPost', existingVersionOfPost)
         if (existingVersionOfPost) {
             logger.debug(`Post ${existingVersionOfPost.postNumber} is already in the DB`)
         } else {
@@ -398,7 +399,7 @@ function handlePostData (postData, threadID) {
                 Image.findOne({
                     where:{media_hash: postData.md5}
                 }).then( (existingVersionOfImageRow) => {
-                    logger.debug('imgTest existingVersionOfImageRow', existingVersionOfImageRow)
+                    logger.trace('imgTest existingVersionOfImageRow', existingVersionOfImageRow)
                     if (existingVersionOfImageRow) {
                         logger.debug('Image is already in the DB')
                         // If MD5 found, use that as our entry in media table
@@ -425,7 +426,7 @@ function handlePostData (postData, threadID) {
                             preview_op: 'local/path/to/preview_op.ext',// TODO
                             preview_reply: thumbFilePath,// TODO Verify format Asagi uses
                         }).then( (imageRow) => {
-                            logger.debug('Image added to DB: ', imageRow)
+                            logger.trace('Image added to DB: ', imageRow)
                             mediaID = imageRow.id
                             logger.debug('mediaID: ', mediaID)
                             insertPostFinal(postData, threadID, mediaID)
@@ -445,12 +446,11 @@ function handlePostData (postData, threadID) {
 function downloadMedia(url, filepath) {
     logger.debug('Saving URL: ', url, 'to filepath: ',filepath)
     limiter.removeTokens(1, function() {
-        logger.debug('Limiter fired.')
+        logger.trace('Limiter fired.')
         // return
-        rp
-            .get(url)
+        rp.get(url)
             .on('error', function(err) {
-                logger.error('downloadMedia() err',{err})
+                logger.error('downloadMedia() err', err)
                 console.log('downloadMedia() err ',err)
                 raise(err)
             }).pipe(fs.createWriteStream(filepath))
@@ -480,7 +480,7 @@ function insertPostFinal (postData, threadID, mediaID) {
         media_hash: postData.md5,//TODO
         media_orig: null,//TODO
     }).then( (postCreatePostResult) =>{
-        // logger.debug('postCreatePostResult ',postCreatePostResult)
+        // logger.trace('postCreatePostResult ',postCreatePostResult)
         return
     })
 }
