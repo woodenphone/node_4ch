@@ -319,6 +319,7 @@ function getThreadTimeLast(threadData) {
 function handleThread(siteURL, boardName, threadID) {
     // Generate API URL
     var threadURL = `${siteURL}/${boardName}/thread/${threadID}.json`
+    logger.info('handlethread() processing thread: ',threadURL)
     // Load thread API URL
     rp(threadURL)
     .then( (htmlString) => {
@@ -340,9 +341,9 @@ function handleThreadData (threadData) {
         }
     }).then( (threadRow) => {
         if (threadRow) {
-            console.log('Thread already in DB: ', threadID)
+            logger.debug('Thread already in DB: ', threadID)
         } else {
-            console.log('Creating entry for thread: ', threadID)
+            logger.debug('Creating entry for thread: ', threadID)
             // Create entry for thread
             Thread.create({
                 threadNumber: threadID,
@@ -357,7 +358,7 @@ function handleThreadData (threadData) {
                 sticky: isPostSticky(opPostData),
                 locked: isPostLocked(opPostData),
             }).then( (threadRow) => {
-                console.log('Thread added to DB: ', threadRow)
+                logger.debug('Thread added to DB: ', threadRow)
             })
         }
     }).then( () => {
@@ -366,18 +367,18 @@ function handleThreadData (threadData) {
 }
 
 function iterateThreadPosts(threadData, threadID) {
-    console.log('Iterating over test thread:',threadData)
+    logger.debug('Iterating over test thread:',threadData)
     lupus(0, threadData.posts.length, (n) => {
-        console.log('processing post index:', n)
+        logger.debug('processing post index:', n)
         var postData = threadData.posts[n]
         handlePostData(postData, threadID)
     }, () => {
-        console.log('finished lupus loop')
+        logger.debug('finished lupus loop')
     })
 }
 
 function handlePostData (postData, threadID) {
-    console.log('handlePostData() postData.no:', postData.no)
+    logger.debug('handlePostData() postData.no:', postData.no)
     // Does post exist in DB?
     Post.findOne({
         where:  {
@@ -385,27 +386,27 @@ function handlePostData (postData, threadID) {
             thread_num: threadID,
         }
     }).then( (existingVersionOfPost) => {
-        console.log('postTest existingVersionOfPost', existingVersionOfPost)
+        logger.debug('postTest existingVersionOfPost', existingVersionOfPost)
         if (existingVersionOfPost) {
-            console.log(`Post ${existingVersionOfPost.postNumber} is already in the DB`)
+            logger.debug(`Post ${existingVersionOfPost.postNumber} is already in the DB`)
         } else {
-            console.log('Post is not in the DB')
+            logger.debug('Post is not in the DB')
             // If post has a file ?post.md5 !== ''?
             if (postData.md5) {
-                console.log(`Post ${postData.no} has an image`)
+                logger.debug(`Post ${postData.no} has an image`)
                 // Lookup MD5 in DB
                 Image.findOne({
                     where:{media_hash: postData.md5}
                 }).then( (existingVersionOfImageRow) => {
-                    console.log('imgTest existingVersionOfImageRow', existingVersionOfImageRow)
+                    logger.debug('imgTest existingVersionOfImageRow', existingVersionOfImageRow)
                     if (existingVersionOfImageRow) {
-                        console.log('Image is already in the DB')
+                        logger.debug('Image is already in the DB')
                         // If MD5 found, use that as our entry in media table
                         mediaID = existingVersionOfImageRow.id
-                        console.log('mediaID: ', mediaID)
+                        logger.debug('mediaID: ', mediaID)
                         insertPostFinal(postData, threadID, mediaID)
                     } else {
-                        console.log(`Image ${postData.md5} is not in the DB`)
+                        logger.debug(`Image ${postData.md5} is not in the DB`)
                         // If no MD5 found, create new entry in media table and use that
                         // Fetch the media files for the post
                         // Decide where to save each file
@@ -424,17 +425,17 @@ function handlePostData (postData, threadID) {
                             preview_op: 'local/path/to/preview_op.ext',// TODO
                             preview_reply: thumbFilePath,// TODO Verify format Asagi uses
                         }).then( (imageRow) => {
-                            console.log('Image added to DB: ', imageRow)
+                            logger.debug('Image added to DB: ', imageRow)
                             mediaID = imageRow.id
-                            console.log('mediaID: ', mediaID)
+                            logger.debug('mediaID: ', mediaID)
                             insertPostFinal(postData, threadID, mediaID)
                         })
                     }
                 })
             } else {
-                console.log(`Post ${postData.no} has no image`)
+                logger.debug(`Post ${postData.no} has no image`)
                 mediaID = null// We don't have media for this post, so use null
-                console.log('mediaID: ', mediaID)
+                logger.debug('mediaID: ', mediaID)
                 insertPostFinal (postData, threadID, mediaID)
             }
         }
@@ -442,9 +443,9 @@ function handlePostData (postData, threadID) {
 }
 
 function downloadMedia(url, filepath) {
-    console.log('Saving URL: ', url, 'to filepath: ',filepath)
+    logger.debug('Saving URL: ', url, 'to filepath: ',filepath)
     limiter.removeTokens(1, function() {
-        console.log('Limiter fired.')
+        logger.debug('Limiter fired.')
         // return
         rp
             .get(url)
@@ -458,7 +459,7 @@ function downloadMedia(url, filepath) {
 
 function insertPostFinal (postData, threadID, mediaID) {
     // Insert the post's data
-    console.log('Inserting post data')
+    logger.debug('Inserting post data')
     return Post.create({
         postNumber: postData.no,
         thread_num: threadID,
@@ -479,7 +480,7 @@ function insertPostFinal (postData, threadID, mediaID) {
         media_hash: postData.md5,//TODO
         media_orig: null,//TODO
     }).then( (postCreatePostResult) =>{
-        // console.log('postCreatePostResult ',postCreatePostResult)
+        // logger.debug('postCreatePostResult ',postCreatePostResult)
         return
     })
 }
