@@ -81,7 +81,7 @@ const threadID = '66770725'
 db.Post.sync({ force: false }).then(db.Image.sync({ force: false })).then(db.Thread.sync({ force: false }))
 // Insert a thread
 // .then(handleThreadData(testThreadData));
-// .then(handlePostData(testPostData));
+// .then(decideThenInsertPost(testPostData));
 .then(handleThread(siteURL, boardName, threadID));
 // .then(handleWholeThreadAtOnce(siteURL, boardName, threadID));
 
@@ -119,21 +119,10 @@ function getThreadTimeLast(threadData) {
 }
 // /Functions that check something about a thread
 
-function handleThread(siteURL, boardName, threadID) {
-    // Generate API URL
-    var threadURL = `${siteURL}/${boardName}/thread/${threadID}.json`
-    logger.info('handleThread() processing thread: ',threadURL)
-    // Load thread API URL
-    rp(threadURL)
-    .then( (htmlString) => {
-        // Decode JSON
-        threadData = JSON.parse(htmlString)
-        // Process thread data
-        handleThreadData (threadData)
-    })    
-}
+
 
 function handleWholeThreadAtOnce(siteURL, boardName, threadID) {
+    // Load a thread from the API; lookup all its posts at once; insert new posts; update existing posts
     // Generate API URL
     var threadURL = `${siteURL}/${boardName}/thread/${threadID}.json`
     logger.info('handleWholeThreadAtOnce() processing thread: ',threadURL)
@@ -215,6 +204,7 @@ function handleWholeThreadAtOnce(siteURL, boardName, threadID) {
 }
 
 function markPostDeleted(postID, threadID) {
+    // Mark a given post as deleted
     logger.debug('markPostDeleted(): ', postID, threadID)
     db.Post.update(
         {
@@ -231,6 +221,7 @@ function markPostDeleted(postID, threadID) {
 }
 
 function compareFindDeletedPostRows (postRows, apiPosts) {
+    // Produce an array of post DB rows  that do not match the 4ch API post objects
     logger.trace('compareFindDeletedPostRows()', postRows, apiPosts)
     var deletedPostRows = []
     for (let i = 0; i< postRows.length-1; i++){
@@ -251,6 +242,7 @@ function compareFindDeletedPostRows (postRows, apiPosts) {
 }
 
 function compareFindNewApiPosts (postRows, apiPosts) {
+    // Produce an array of 4ch API post objects that do not match any item in the given post DB rows
     logger.trace('compareFindNewApiPosts()', postRows, apiPosts)
     var newApiPosts = []
     for (let i = 0; i< apiPosts.length-1; i++){
@@ -273,9 +265,23 @@ function compareFindNewApiPosts (postRows, apiPosts) {
 
 
 
-
+function handleThread(siteURL, boardName, threadID) {
+    // Load a thread from the API; then lookup and insert it, its posts, and its media
+    // Generate API URL
+    var threadURL = `${siteURL}/${boardName}/thread/${threadID}.json`
+    logger.info('handleThread() processing thread: ',threadURL)
+    // Load thread API URL
+    rp(threadURL)
+    .then( (htmlString) => {
+        // Decode JSON
+        threadData = JSON.parse(htmlString)
+        // Process thread data
+        handleThreadData (threadData)
+    })    
+}
 
 function handleThreadData (threadData) {
+    // Check if thread has entry in the db; if not make one; then lookup and insert its posts and media.
     // Extract thread-level data from OP
     var opPostData = threadData.posts[0]
     var threadID = opPostData.no
@@ -312,18 +318,20 @@ function handleThreadData (threadData) {
 }
 
 function iterateThreadPosts(threadData, threadID) {
+    // Check the DB for posts and insert them and their media if absent
     logger.trace('Iterating over test thread:',threadData)
     lupus(0, threadData.posts.length, (n) => {
         logger.trace('processing post index:', n)
         var postData = threadData.posts[n]
-        handlePostData(postData, threadID)
+        decideThenInsertPost(postData, threadID)
     }, () => {
         logger.trace('finished lupus loop')
     })
 }
 
-function handlePostData (postData, threadID) {// old
-    logger.debug('handlePostData() postData.no:', postData.no)
+function decideThenInsertPost (postData, threadID) {
+    // Check the DB for a post and insert it and its media if absent
+    logger.debug('decideThenInsertPost() postData.no:', postData.no)
     // Does post exist in DB?
     db.Post.findOne({
         where:  {
@@ -331,7 +339,7 @@ function handlePostData (postData, threadID) {// old
             thread_num: threadID,
         }
     }).then( (existingVersionOfPost) => {
-        logger.trace('postTest existingVersionOfPost', existingVersionOfPost)
+        logger.trace('existingVersionOfPost', existingVersionOfPost)
         if (existingVersionOfPost) {
             logger.debug(`Post ${existingVersionOfPost.postNumber} is already in the DB`)
         } else {
@@ -341,7 +349,8 @@ function handlePostData (postData, threadID) {// old
     })
 }
 
-function insertPost(postData, threadID) {// NEW
+function insertPost(postData, threadID) {
+    // Insert a post without looking at the DB first
     logger.debug('insertPost()', postData.no)
     // logger.debug('Post is not in the DB')
     // If post has a file ?post.md5 !== ''?
@@ -396,6 +405,7 @@ function insertPost(postData, threadID) {// NEW
 }
 
 function downloadMedia(url, filepath) {
+    // Save a target URL to a target path
     logger.debug('Saving URL: ', url, 'to filepath: ',filepath)
     limiter.removeTokens(1, function() {
         logger.trace('Limiter fired.')
