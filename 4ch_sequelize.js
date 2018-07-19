@@ -214,10 +214,12 @@ function handlePostData (postData, threadID) {
                         // If no MD5 found, create new entry in media table and use that
                         // Fetch the media files for the post
                         // Decide where to save each file
+                        // Images: http(s)://i.4cdn.org/board/tim.ext
                         var fullURL = `https://i.4cdn.org/${boardName}/${postData.tim}${postData.ext}`
                         var fullFilePath = `debug/${boardName}/${postData.tim}${postData.ext}`
+                        // Thumbnails: http(s)://i.4cdn.org/board/tims.jpg
                         var thumbURL = `https://i.4cdn.org/${boardName}/${postData.tim}s${postData.ext}`
-                        var thumbFilePath = `debug/${boardName}/thumb/${postData.tim}s${postData.ext}`
+                        var thumbFilePath = `debug/${boardName}/thumb/${postData.tim}s.jpg`
                         // Save full image
                         downloadMedia(fullURL, fullFilePath)
                         // Save thumb
@@ -301,8 +303,7 @@ function insertPostFinal (postData, threadID, mediaID) {
         media_hash: postData.md5,//TODO
         media_orig: null,//TODO
     }).then( (postCreatePostResult) =>{
-        // logger.trace('postCreatePostResult ',postCreatePostResult)
-        return
+        return logger.trace('postCreatePostResult ',postCreatePostResult)
     })
 }
 

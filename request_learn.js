@@ -6,8 +6,10 @@ const request = require('request');// for file streaming
 const rp = require('request-promise');// for pages
 const fs = require('fs-extra');
 const lupus = require('lupus');
+var logger = require('tracer').colorConsole();
 var RateLimiter = require('limiter').RateLimiter;
 var limiter = new RateLimiter(1, 100);
+
 
 // var threadData = jsonFile.readFileSync('git_ignored\\test_thread.json');
 
@@ -48,10 +50,35 @@ function downloadMedia(url, filepath, attempt=0) {
   // console.log('DL disabled for debugging')
   // return
   
-  request.get(url)
+  rp.get(url)
   .on('error', (err) => {
     console.log('downloadMedia() err', err)
     if (attempt < maxAttempts) return downloadMedia(url, filepath, attempt)
+  }).then( (data) => {
+      // Save data to disk
+      fs.writeFile(filepath, data, (err) => {
+          if(err) {
+              logger.error(err);
+              //TODO Retry
+          } else {
+              // TODO handle success
+          }
+      })
   })
-  .pipe(fs.createWriteStream(filepath))
 }
+
+function saveFile(filepath, data) {
+  return new Promise( (resolve, reject) {
+    h = fs.writeFile(filepath, data, (err) => {
+      if(err) {
+          logger.error(err);
+          //TODO Retry
+          reject(err)
+      } else {
+          // TODO handle success
+          resolve(h)
+      }
+    })
+  })
+}
+
