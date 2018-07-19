@@ -7,6 +7,7 @@ const lupus = require('lupus');
 const Sequelize = require('sequelize');
 const rp = require('request-promise')
 const rp_errors = require('request-promise/errors');
+const request = require('request');// for file streaming
 var RateLimiter = require('limiter').RateLimiter;
 var limiter = new RateLimiter(1, 1000);
 
@@ -82,7 +83,7 @@ db.Post.sync({ force: false }).then(db.Image.sync({ force: false })).then(db.Thr
 // .then(handleThreadData(testThreadData));
 // .then(handlePostData(testPostData));
 .then(handleThread(siteURL, boardName, threadID));
-
+// .then(handleWholeThreadAtOnce(siteURL, boardName, threadID));
 
 
 // Functions that check if a post is something
@@ -118,12 +119,10 @@ function getThreadTimeLast(threadData) {
 }
 // /Functions that check something about a thread
 
-
-
 function handleThread(siteURL, boardName, threadID) {
     // Generate API URL
     var threadURL = `${siteURL}/${boardName}/thread/${threadID}.json`
-    logger.info('handlethread() processing thread: ',threadURL)
+    logger.info('handleThread() processing thread: ',threadURL)
     // Load thread API URL
     rp(threadURL)
     .then( (htmlString) => {
@@ -131,8 +130,150 @@ function handleThread(siteURL, boardName, threadID) {
         threadData = JSON.parse(htmlString)
         // Process thread data
         handleThreadData (threadData)
+    })    
+}
+
+function handleWholeThreadAtOnce(siteURL, boardName, threadID) {
+    // Generate API URL
+    var threadURL = `${siteURL}/${boardName}/thread/${threadID}.json`
+    logger.info('handleWholeThreadAtOnce() processing thread: ',threadURL)
+    // Load thread API URL
+    rp(threadURL)
+    .then( (htmlString) => {
+        // Decode JSON
+        threadData = JSON.parse(htmlString)
+        // Process thread data
+        // Extract thread-level data from OP
+        var opPostData = threadData.posts[0]
+        var threadID = opPostData.no
+        // Lookup threadID in the DB
+        return db.Thread.findOne({
+            where:  {
+                threadNumber: threadID,
+            }
+        }).then( (threadRow) => {
+            if (threadRow) {
+                logger.debug('Thread already in DB: ', threadID)
+            } else {
+                logger.debug('Creating entry for thread: ', threadID)
+                // Create entry for thread
+                db.Thread.create({
+                    threadNumber: threadID,
+                    time_op: opPostData.time,//TODO
+                    time_last: getThreadTimeLast(threadData),//TODO
+                    time_bump: getThreadTimeLastBumped(threadData),//TODO find better way of calculating this value
+                    time_ghost: null,//TODO
+                    time_ghost_bump: null,//TODO
+                    time_last_modified: getThreadTimeLastModified(threadData),//TODO Should be calculating by inspecting every post, and updating db to highest only if the highest is greater than the DB
+                    nreplies: opPostData.replies,//TODO We should actually count the entries in the DB
+                    nimages: opPostData.images,//TODO We should actually count the entries in the DB
+                    sticky: isPostSticky(opPostData),
+                    locked: isPostLocked(opPostData),
+                }).then( (threadRow) => {
+                    logger.trace('Thread added to DB: ', threadRow)
+                })
+            }
+        }).then( () => {
+            // Load existing posts from DB
+            db.Post.findAll({
+                where:  {
+                    thread_num: threadID,
+                }
+            }).then( (postRows) => {
+                logger.trace('handleWholeThreadAtOnce() postRows', postRows)
+                logger.debug('handleWholeThreadAtOnce() postRows.length ', postRows.length)
+                // Compare data for each post in the DB against the API
+
+                // Find posts in DB but not in API (deleted)
+                deletedPostRows = compareFindDeletedPostRows(postRows, apiPosts=threadData.posts)
+                logger.debug('handleWholeThreadAtOnce() deletedPostRows.length ', deletedPostRows.length)
+                // Insert posts in DB but not in API (deleted)
+                np = Promise.all(deletedPostRows.map(function (postData) {
+                    postID = postData.no
+                    return markPostDeleted(postData, threadID);
+                })).then(function (arrayOfResults) {
+                    logger.trace('handleWholeThreadAtOnce() np() arrayOfResults', arrayOfResults)
+                })
+                
+                // Deal with posts in DB and in API (meh.)
+                // TODO
+
+                // Find posts in not DB but in API (new)
+                newApiPosts = compareFindNewApiPosts(postRows, apiPosts=threadData.posts)
+                logger.debug('handleWholeThreadAtOnce() newApiPosts.length ', newApiPosts.length)
+                // Update posts in not DB but in API (new)
+                dp = Promise.all(newApiPosts.map(function (postRow) {
+                    postID = postRow.postNumber
+                    return insertPost(postID, threadID);
+                })).then(function (arrayOfResults) {
+                    logger.trace('handleThread() dp() arrayOfResults', arrayOfResults)
+                })
+
+            })
+        })
     })
 }
+
+function markPostDeleted(postID, threadID) {
+    logger.debug('markPostDeleted(): ', postID, threadID)
+    db.Post.update(
+        {
+            deleted: 1,
+        },{
+        where: {
+            post_number: postID,
+            thread_num: threadID
+            }
+        }
+    ).then( (result) => {
+        logger.debug('markPostDeleted(): ', result)
+    })
+}
+
+function compareFindDeletedPostRows (postRows, apiPosts) {
+    logger.trace('compareFindDeletedPostRows()', postRows, apiPosts)
+    var deletedPostRows = []
+    for (let i = 0; i< postRows.length-1; i++){
+        postRow = postRows[i]
+        var matched = false
+        for (let j = 0; j< apiPosts.length-1; j++){
+            apiPost = apiPosts[j]
+            if (dbPost.postNumber == apiPost.no) {
+                matched = true// If in DB but not API
+            }
+        }
+        if (matched){
+            deletedPostRows.push(postRow)
+        }
+    }
+    logger.trace('compareFindDeletedPostRows() deletedPostRows', deletedPostRows)
+    return deletedPostRows
+}
+
+function compareFindNewApiPosts (postRows, apiPosts) {
+    logger.trace('compareFindNewApiPosts()', postRows, apiPosts)
+    var newApiPosts = []
+    for (let i = 0; i< apiPosts.length-1; i++){
+        apiPost = apiPosts[i]
+        var matched = false
+        for (let j = 0; j< postRows.length-1; j++){
+            dbPost = postRows[j]
+            if (dbPost.postNumber == apiPost.no) {
+                matched = true// If in API but not DB
+            }
+        }
+        if (matched){
+            newApiPosts.push(apiPost)
+        }
+    }
+    logger.trace('compareFindNewApiPosts() newApiPosts', newApiPosts)
+    return newApiPosts
+}
+
+
+
+
+
 
 function handleThreadData (threadData) {
     // Extract thread-level data from OP
@@ -181,7 +322,7 @@ function iterateThreadPosts(threadData, threadID) {
     })
 }
 
-function handlePostData (postData, threadID) {
+function handlePostData (postData, threadID) {// old
     logger.debug('handlePostData() postData.no:', postData.no)
     // Does post exist in DB?
     db.Post.findOne({
@@ -195,57 +336,63 @@ function handlePostData (postData, threadID) {
             logger.debug(`Post ${existingVersionOfPost.postNumber} is already in the DB`)
         } else {
             logger.debug('Post is not in the DB')
-            // If post has a file ?post.md5 !== ''?
-            if (postData.md5) {
-                logger.debug(`Post ${postData.no} has an image`)
-                // Lookup MD5 in DB
-                db.Image.findOne({
-                    where:{media_hash: postData.md5}
-                }).then( (existingVersionOfImageRow) => {
-                    logger.trace('imgTest existingVersionOfImageRow', existingVersionOfImageRow)
-                    if (existingVersionOfImageRow) {
-                        logger.debug('Image is already in the DB')
-                        // If MD5 found, use that as our entry in media table
-                        mediaID = existingVersionOfImageRow.id
-                        logger.debug('mediaID: ', mediaID)
-                        insertPostFinal(postData, threadID, mediaID)
-                    } else {
-                        logger.debug(`Image ${postData.md5} is not in the DB`)
-                        // If no MD5 found, create new entry in media table and use that
-                        // Fetch the media files for the post
-                        // Decide where to save each file
-                        // Images: http(s)://i.4cdn.org/board/tim.ext
-                        var fullURL = `https://i.4cdn.org/${boardName}/${postData.tim}${postData.ext}`
-                        var fullFilePath = `debug/${boardName}/${postData.tim}${postData.ext}`
-                        // Thumbnails: http(s)://i.4cdn.org/board/tims.jpg
-                        var thumbURL = `https://i.4cdn.org/${boardName}/${postData.tim}s${postData.ext}`
-                        var thumbFilePath = `debug/${boardName}/thumb/${postData.tim}s.jpg`
-                        // Save full image
-                        downloadMedia(fullURL, fullFilePath)
-                        // Save thumb
-                        downloadMedia(thumbURL, thumbFilePath)
-                        // Insert row into Images table
-                        db.Image.create({
-                            media_hash: postData.md5,
-                            media: fullFilePath,// TODO Verify format Asagi uses
-                            preview_op: 'local/path/to/preview_op.ext',// TODO
-                            preview_reply: thumbFilePath,// TODO Verify format Asagi uses
-                        }).then( (imageRow) => {
-                            logger.trace('Image added to DB: ', imageRow)
-                            mediaID = imageRow.id
-                            logger.debug('mediaID: ', mediaID)
-                            insertPostFinal(postData, threadID, mediaID)
-                        })
-                    }
-                })
-            } else {
-                logger.debug(`Post ${postData.no} has no image`)
-                mediaID = null// We don't have media for this post, so use null
-                logger.debug('mediaID: ', mediaID)
-                insertPostFinal (postData, threadID, mediaID)
-            }
+            insertPost(postData, threadID)
         }
     })
+}
+
+function insertPost(postData, threadID) {// NEW
+    logger.debug('insertPost()', postData.no)
+    // logger.debug('Post is not in the DB')
+    // If post has a file ?post.md5 !== ''?
+    if (postData.md5) {
+        logger.debug(`Post ${postData.no} has an image`)
+        // Lookup MD5 in DB
+        db.Image.findOne({
+            where:{media_hash: postData.md5}
+        }).then( (existingVersionOfImageRow) => {
+            logger.trace('imgTest existingVersionOfImageRow', existingVersionOfImageRow)
+            if (existingVersionOfImageRow) {
+                logger.debug('Image is already in the DB')
+                // If MD5 found, use that as our entry in media table
+                mediaID = existingVersionOfImageRow.id
+                logger.debug('mediaID: ', mediaID)
+                insertPostFinal(postData, threadID, mediaID)
+            } else {
+                logger.debug(`Image ${postData.md5} is not in the DB`)
+                // If no MD5 found, create new entry in media table and use that
+                // Fetch the media files for the post
+                // Decide where to save each file
+                // Images: http(s)://i.4cdn.org/board/tim.ext
+                var fullURL = `https://i.4cdn.org/${boardName}/${postData.tim}${postData.ext}`
+                var fullFilePath = `debug/${boardName}/${postData.tim}${postData.ext}`
+                // Thumbnails: http(s)://i.4cdn.org/board/tims.jpg
+                var thumbURL = `https://i.4cdn.org/${boardName}/${postData.tim}s${postData.ext}`
+                var thumbFilePath = `debug/${boardName}/thumb/${postData.tim}s.jpg`
+                // Save full image
+                downloadMedia(fullURL, fullFilePath)
+                // Save thumb
+                downloadMedia(thumbURL, thumbFilePath)
+                // Insert row into Images table
+                db.Image.create({
+                    media_hash: postData.md5,
+                    media: fullFilePath,// TODO Verify format Asagi uses
+                    preview_op: 'local/path/to/preview_op.ext',// TODO
+                    preview_reply: thumbFilePath,// TODO Verify format Asagi uses
+                }).then( (imageRow) => {
+                    logger.trace('Image added to DB: ', imageRow)
+                    mediaID = imageRow.id
+                    logger.debug('mediaID: ', mediaID)
+                    insertPostFinal(postData, threadID, mediaID)
+                })
+            }
+        })
+    } else {
+        logger.debug(`Post ${postData.no} has no image`)
+        mediaID = null// We don't have media for this post, so use null
+        logger.trace('mediaID: ', mediaID)
+        insertPostFinal (postData, threadID, mediaID)
+    }
 }
 
 function downloadMedia(url, filepath) {
@@ -253,15 +400,16 @@ function downloadMedia(url, filepath) {
     limiter.removeTokens(1, function() {
         logger.trace('Limiter fired.')
         // return
-        rp.get(url)
-        .catch(rp_errors.StatusCodeError, function (reason) {
-            logger.error('downloadMedia() caught StatusCodeError', reason)
-            // The server responded with a status codes other than 2xx.
-            // Check reason.statusCode
-            if (reason.statusCode == 404) {
-                //TODO Handle 404
-            }
-        }).on('error', function(err) {
+        request.get(url)
+        // .catch(rp_errors.StatusCodeError, function (reason) {
+        //     logger.error('downloadMedia() caught StatusCodeError', reason)
+        //     // The server responded with a status codes other than 2xx.
+        //     // Check reason.statusCode
+        //     if (reason.statusCode == 404) {
+        //         //TODO Handle 404
+        //     }
+        // })
+        .on('error', function(err) {
             logger.error('downloadMedia() err', err)
             console.log('downloadMedia() err ',err)
             raise(err)

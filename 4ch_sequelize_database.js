@@ -199,6 +199,11 @@ const Post = sequelize.define('post', {
     media_orig: {
         type: Sequelize.TEXT
     },
+    deleted: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+    },
 });
 
 exports.Image = Image;
