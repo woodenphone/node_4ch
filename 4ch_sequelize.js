@@ -6,7 +6,7 @@ const fs = require('fs-extra');
 const lupus = require('lupus');
 const Sequelize = require('sequelize');
 const rp = require('request-promise')
-var rp_errors = require('request-promise/errors');
+const rp_errors = require('request-promise/errors');
 var RateLimiter = require('limiter').RateLimiter;
 var limiter = new RateLimiter(1, 1000);
 
@@ -261,22 +261,22 @@ function downloadMedia(url, filepath) {
             if (reason.statusCode == 404) {
                 //TODO Handle 404
             }
-        // }).on('error', function(err) {
-        //     logger.error('downloadMedia() err', err)
-        //     console.log('downloadMedia() err ',err)
-        //     raise(err)
-        // }).pipe(fs.createWriteStream(filepath))
-        }).then( (data) => {
-            // Save data to disk
-            fs.writeFile(filepath, data, (err) => {
-                if(err) {
-                    logger.error(err);
-                    //TODO Retry
-                } else {
-                    // TODO handle success
-                }
-            })
-        })
+        }).on('error', function(err) {
+            logger.error('downloadMedia() err', err)
+            console.log('downloadMedia() err ',err)
+            raise(err)
+        }).pipe(fs.createWriteStream(filepath))
+        // }).then( (data) => {
+        //     // Save data to disk
+        //     fs.writeFile(filepath, data, (err) => {
+        //         if(err) {
+        //             logger.error(err);
+        //             //TODO Retry
+        //         } else {
+        //             // TODO handle success
+        //         }
+        //     })
+        // })
     })
 }
 
