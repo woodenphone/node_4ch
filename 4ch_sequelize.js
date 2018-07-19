@@ -7,7 +7,21 @@ const Sequelize = require('sequelize');
 const rp = require('request-promise')
 var RateLimiter = require('limiter').RateLimiter;
 var limiter = new RateLimiter(1, 10000);
+const winston = require('winston')
+winston.level = 'debug'
 
+const logger = winston.createLogger({
+    transports: [
+      new winston.transports.Console(),
+      new winston.transports.File({ filename: 'debug/combined.log' })
+    ],
+    exceptionHandlers: [
+        new winston.transports.File({ filename: 'debug/exceptions.log' })
+    ]
+  });
+
+
+  
 // Connect to the DB
 const sequelize = new Sequelize('database', 'username', 'password', {
     host: 'localhost',
@@ -213,12 +227,12 @@ const Post = sequelize.define('post', {
 
 const siteURL = 'https://a.4cdn.org'
 const boardName = 'g'
-const threadID = '66787680'
+const threadID = '66793151'
 
 
-var testThreadData = jsonFile.readFileSync('git_ignored\\test_thread.json');
-console.log('testThreadData', testThreadData)
-var testThreadID = testThreadData.posts[0].no// TODO Find safer way to generate threadID
+// var testThreadData = jsonFile.readFileSync('git_ignored\\test_thread.json');
+// logger.log('info', 'testThreadData', {'testThreadData':testThreadData})
+// var testThreadID = testThreadData.posts[0].no// TODO Find safer way to generate threadID
 // var testPostData = testThreadData.posts[0]
 // console.log('testPostData', testPostData)
 
@@ -266,6 +280,7 @@ Post.sync({ force: false }).then(Image.sync({ force: false })).then(Thread.sync(
 .then(handleThread(siteURL, boardName, threadID));
 
 
+
 // Functions that check if a post is something
 function isPostSticky(postData) {
     //Non-sticky posts will lack 'sticky' key or have it set to false
@@ -285,6 +300,7 @@ function isPostSpoiler(postData) {
     return (postData.spoiler == 1)
 }
 // /Functions that check if a post is something
+
 // Functions that check something about a thread
 function getThreadTimeLastBumped(threadData) {
     return threadData.posts[threadData.posts.length-1].time
@@ -297,6 +313,8 @@ function getThreadTimeLast(threadData) {
     return threadData.posts[threadData.posts.length-1].time
 }
 // /Functions that check something about a thread
+
+
 
 function handleThread(siteURL, boardName, threadID) {
     // Generate API URL
@@ -394,7 +412,7 @@ function handlePostData (postData, threadID) {
                         var fullURL = `https://i.4cdn.org/${boardName}/${postData.tim}${postData.ext}`
                         var fullFilePath = `debug/${boardName}/${postData.tim}${postData.ext}`
                         var thumbURL = `https://i.4cdn.org/${boardName}/${postData.tim}s${postData.ext}`
-                        var thumbFilePath = `debug/${boardName}/${postData.tim}s${postData.ext}`
+                        var thumbFilePath = `debug/${boardName}/thumb/${postData.tim}s${postData.ext}`
                         // Save full image
                         downloadMedia(fullURL, fullFilePath)
                         // Save thumb
@@ -431,7 +449,8 @@ function downloadMedia(url, filepath) {
         rp
             .get(url)
             .on('error', function(err) {
-                console.log(err)
+                logger.error('downloadMedia() err',{err})
+                console.log('downloadMedia() err ',err)
                 raise(err)
             }).pipe(fs.createWriteStream(filepath))
     })
