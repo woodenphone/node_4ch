@@ -342,20 +342,20 @@ function compareFindNewApiPosts (postRows, apiPosts) {// WIP
     var newApiPosts = []
 
     // Format into object type for sorting
-    var ApiPostsObj = {}
-    for (var i = 0; i< apiPosts.length-1; i++){
-        var apiPost = apiPosts[i]
-        var apiPostNumber = apiPost.no
-        ApiPostsObj[apiPostNumber] = apiPost
+    var postRowsObj = {}
+    for (var i = 0; i< postRows.length-1; i++){
+        var postRow = postRows[i]
+        var postRowNumber = postRow.postNumber
+        postRowsObj[postRowNumber] = postRow
     }
 
     // Select items that occur only apiPosts
-    for (var j = 0; j< postRows.length-1; j++){
-        var postRow = postRows[j]
-        var postRowNumber = postRow.postNumber
-        if (! postRowNumber in ApiPostsObj) {
+    for (var j = 0; j< apiPosts.length-1; j++){
+        var apiPost = apiPosts[j]
+        var apiPostNumber = apiPost.no
+        if ( ! (apiPostNumber in postRowsObj) ) {
             // Add to output
-            var match = ApiPostsObj[postRowNumber]
+            var match = apiPost
             newApiPosts.push(match)
         }
     }
