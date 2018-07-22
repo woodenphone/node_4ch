@@ -254,11 +254,13 @@ function handleWholeThreadAtOnce(siteURL, boardName, threadID) {
         })
         .catch( (err) => {     
             if (err.statusCode === 404) {
+                // TODO Mark as expired/removed?
                 logger.error('404 for threadURL', threadURL)
                 trans.rollback()
                 return
             } else {
                 logger.error(err)
+                trans.rollback()
                 throw(err)
             }
         })
