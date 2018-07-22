@@ -6,20 +6,20 @@ const Sequelize = require('sequelize');
 const sequelize = new Sequelize('database', 'username', 'password', {
     host: 'localhost',
     dialect: 'sqlite',
-  
+
     pool: {
-      max: 5,
-      min: 0,
-      acquire: 30000,
-      idle: 10000
+        max: 5,
+        min: 0,
+        acquire: 30000,
+        idle: 10000
     },
-  
+
     // SQLite only
     storage: 'junk_sequelize.sqlite',
-  
+
     // http://docs.sequelizejs.com/manual/tutorial/querying.html#operators
     operatorsAliases: false
-  });
+});
 
 sequelize
     .authenticate()
@@ -30,9 +30,20 @@ sequelize
         console.error('Unable to connect to the database:', err);
     });
 
+
 // Define Board columns
 const Board = sequelize.define('board', {
-    name: {
+    displayName: {
+        type: Sequelize.TEXT,
+        allowNull: false,
+        unique: 'BoardNameUniqueIndex',
+    },
+    urlName: {
+        type: Sequelize.TEXT,
+        allowNull: false,
+        unique: 'BoardNameUniqueIndex',
+    },
+    siteUrl: {
         type: Sequelize.TEXT,
         allowNull: false,
         unique: 'BoardNameUniqueIndex',

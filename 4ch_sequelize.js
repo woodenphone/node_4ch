@@ -90,14 +90,59 @@ db.Post.sync({ force: false }).then(db.Image.sync({ force: false })).then(db.Thr
 // .then(handleThreadData(global_testThreadData))
 // .then(decideThenInsertPost (postData, threadId, trans, boardName))
 // .then(handleThread(global_siteURL, global_boardName, global_threadID))
-.then(handleWholeThreadAtOnce( global_siteURL, global_boardName, global_threadID ) )
+// .then(handleWholeThreadAtOnce( global_siteURL, global_boardName, global_threadID ) )
 // .then(handleMultipleThreadsSequentially(global_siteURL, global_boardName, global_threadIds))
+.then(handleThreads(global_siteURL, global_boardName))
 .catch( (err) => {
     logger.error(err)
 });
 
 
+function handleThreads(siteURL, boardName) {
+    // 
+    logger.debug('Processing threads for board: ',boardName)
+    var threadsUrl = `${siteURL}/${boardName}/threads.json`
+    fetchApiJson(threadsUrl)
+    .then( (apiThreads) =>{
+    logger.debug('apiThreads: ',apiThreads)
+    // get a list threadIds
+    var threadsList = joinApiThreadsLists(apiThreads)
+    logger.debug('threadsList: ',threadsList)
+    var threadIds = joinApiThreadsListsIds(apiThreads)
+    logger.debug('threadIds: ',threadIds)
+    handleMultipleThreadsSequentially(siteURL, boardName, threadIds)
+    })
+}
 
+function joinApiThreadsLists (apiThreads) {
+    // Join the lists from threads.json together
+    var output = []
+    for (var i = 0; i< apiThreads.length; i++){
+        //
+        var pageThreads = apiThreads[i].threads
+        for (var j = 0; j< pageThreads.length; j++){
+            //
+            var thread = pageThreads[j]
+            output.push(thread)
+        }
+    }
+    return output
+}
+
+function joinApiThreadsListsIds (apiThreads) {
+    // Join the lists from threads.json together
+    var output = []
+    for (var i = 0; i< apiThreads.length; i++){
+        //
+        var pageThreads = apiThreads[i].threads
+        for (var j = 0; j< pageThreads.length; j++){
+            //
+            var threadId = pageThreads[j].no
+            output.push(threadId)
+        }
+    }
+    return output
+}
 
 async function handleMultipleThreadsSequentially(siteURL, boardName, threadIds) {
     // Iterate over an array of threadIDs
@@ -150,7 +195,12 @@ function fetchApiJson(url) {
         logger.debug('Loading API URL: ', url)
         limiter.removeTokens(1, function() {
             logger.trace('Limiter fired.')
-            resolve(rp(url))
+            rp(url)
+            .then( (dataString) => {
+            // Decode JSON
+            var decoded = JSON.parse(dataString)
+            resolve( decoded)
+            })
         })
     })
 }
@@ -163,9 +213,7 @@ async function handleWholeThreadAtOnce(siteURL, boardName, threadId) {
         logger.info('processing thread: ',threadURL)
         // Load thread API URL
         return fetchApiJson(threadURL)
-        .then( (htmlString) => {
-            // Decode JSON
-            var threadData = JSON.parse(htmlString)
+        .then( (threadData) => {
             // Process thread data
             // Extract thread-level data from OP
             var opPostData = threadData.posts[0]
