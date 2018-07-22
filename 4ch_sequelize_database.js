@@ -41,6 +41,7 @@ const Image = sequelize.define('image', {
     media_hash: {
         type: Sequelize.TEXT,
         allowNull: false,
+        unique: 'MediaHashUniqueIndex',
     },
     media: {
         type: Sequelize.TEXT
@@ -67,7 +68,7 @@ const Thread = sequelize.define('thread', {
     threadNumber: {
         type: Sequelize.INTEGER,
         allowNull: false,
-        unique: 'ThreadNumberUniqueIndex'
+        unique: 'ThreadNumberUniqueIndex',
     },
     time_op: {
         type: Sequelize.INTEGER,
@@ -120,10 +121,12 @@ const Post = sequelize.define('post', {
     postNumber: {
         type: Sequelize.INTEGER,
         allowNull: false,
+        unique: 'PostNumberAndThreadNumberUniqueIndex'
     },
     thread_num: {
         type: Sequelize.INTEGER,
         allowNull: false,
+        unique: 'PostNumberAndThreadNumberUniqueIndex'
         // model: Thread,// Foreign key
         // key: 'threadNumber'// Foreign key
     },

@@ -8,6 +8,7 @@ const Sequelize = require('sequelize');
 const rp = require('request-promise')
 const rp_errors = require('request-promise/errors');
 const request = require('request');// for file streaming
+const assert = require('assert');
 var RateLimiter = require('limiter').RateLimiter;
 var limiter = new RateLimiter(1, 1000);
 
@@ -125,13 +126,12 @@ function getThreadTimeLast(threadData) {
 
 function handleWholeThreadAtOnce(siteURL, boardName, threadID) {
     // Load a thread from the API; lookup all its posts at once; insert new posts; update existing posts
-    return db.sequelize.transaction( (trans) => {
+    return db.sequelize.transaction().then( (trans) => {
         // Generate API URL
         var threadURL = `${siteURL}/${boardName}/thread/${threadID}.json`
         logger.info('processing thread: ',threadURL)
         // Load thread API URL
-        rp(threadURL)
-        .then( (htmlString) => {
+        return rp(threadURL).then( (htmlString) => {
             // Decode JSON
             threadData = JSON.parse(htmlString)
             // Process thread data
@@ -149,6 +149,7 @@ function handleWholeThreadAtOnce(siteURL, boardName, threadID) {
             ).then( (threadRow) => {
                 if (threadRow) {
                     logger.debug('Thread already in DB: ', threadID)
+                    return
                 } else {
                     logger.debug('Creating entry for thread: ', threadID)
                     // Create entry for thread
@@ -192,12 +193,15 @@ function handleWholeThreadAtOnce(siteURL, boardName, threadID) {
                     deletedPostRows = compareFindDeletedPostRows(postRows, apiPosts=threadData.posts)
                     logger.debug('deletedPostRows.length ', deletedPostRows.length)
                     // Insert posts in DB but not in API (deleted)
-                    np = Promise.all(deletedPostRows.map( (postData) => {
-                        postID = postData.no
-                        return markPostDeleted(postData, threadID, trans);
+                    np = Promise.all(deletedPostRows.map( (postRow) => {
+                        postID = postRow.postNumber
+                        if (postRow.deleted === 0) {
+                            return markPostDeleted(postID, threadID, trans);
+                        }
                     })).then( (arrayOfResults) => {
                         logger.trace('np() arrayOfResults', arrayOfResults)
-                    }).catch( (err) => {
+                    })
+                    .catch( (err) => {
                         logger.error(err)
                     })
                     
@@ -217,6 +221,10 @@ function handleWholeThreadAtOnce(siteURL, boardName, threadID) {
                     .catch( (err) => {
                         logger.error(err)
                     })
+                    return
+                })
+                .then( (result) => {
+                    return trans.commit()
                 })
                 .catch( (err) => {
                     logger.error(err)
@@ -274,7 +282,7 @@ function markPostDeleted(postID, threadID, trans) {
             deleted: 1,
         },{
         where: {
-            post_number: postID,
+            postNumber: postID,
             thread_num: threadID
             }
         },
@@ -289,10 +297,10 @@ function compareFindDeletedPostRows (postRows, apiPosts) {
     logger.trace('postRows, apiPosts:', postRows, apiPosts)
     var deletedPostRows = []
     for (let i = 0; i< postRows.length-1; i++){
-        dbPost = postRows[i]
+        var dbPost = postRows[i]
         var matched = false
         for (let j = 0; j< apiPosts.length-1; j++){
-            apiPost = apiPosts[j]
+            var apiPost = apiPosts[j]
             if (dbPost.postNumber == apiPost.no) {
                 matched = true// If in DB but not API
             }
@@ -305,24 +313,54 @@ function compareFindDeletedPostRows (postRows, apiPosts) {
     return deletedPostRows
 }
 
-function compareFindNewApiPosts (postRows, apiPosts) {
+// function compareFindNewApiPosts (postRows, apiPosts) {
+//     // Produce an array of 4ch API post objects that do not match any item in the given post DB rows
+//     logger.trace('postRows, apiPosts:', postRows, apiPosts)
+//     var newApiPosts = []
+//     for (let i = 0; i< apiPosts.length-1; i++){
+//         var apiPost = apiPosts[i]
+//         var matched = false
+//         for (let j = 0; j< postRows.length-1; j++){
+//             dbPost = postRows[j]
+//             if (dbPost.postNumber == apiPost.no) {
+//                 matched = true// If in API but not DB
+//             }
+//         }
+//         if (matched){
+//             newApiPosts.push(apiPost)
+//         }
+//     }
+//     logger.trace('newApiPosts:', newApiPosts)
+//     return newApiPosts
+// }
+
+
+function compareFindNewApiPosts (postRows, apiPosts) {// WIP
     // Produce an array of 4ch API post objects that do not match any item in the given post DB rows
-    logger.trace('compareFindNewApiPosts()', postRows, apiPosts)
+    logger.debug('postRows, apiPosts:', postRows, apiPosts)
+    assert.ok( (postRows.length <= apiPosts.length) )
     var newApiPosts = []
-    for (let i = 0; i< apiPosts.length-1; i++){
-        apiPost = apiPosts[i]
-        var matched = false
-        for (let j = 0; j< postRows.length-1; j++){
-            dbPost = postRows[j]
-            if (dbPost.postNumber == apiPost.no) {
-                matched = true// If in API but not DB
-            }
-        }
-        if (matched){
-            newApiPosts.push(apiPost)
+
+    // Format into object type for sorting
+    var ApiPostsObj = {}
+    for (var i = 0; i< apiPosts.length-1; i++){
+        var apiPost = apiPosts[i]
+        var apiPostNumber = apiPost.no
+        ApiPostsObj[apiPostNumber] = apiPost
+    }
+
+    // Select items that occur only apiPosts
+    for (var j = 0; j< postRows.length-1; j++){
+        var postRow = postRows[j]
+        var postRowNumber = postRow.postNumber
+        if (! postRowNumber in ApiPostsObj) {
+            // Add to output
+            var match = ApiPostsObj[postRowNumber]
+            newApiPosts.push(match)
         }
     }
-    logger.trace('compareFindNewApiPosts() newApiPosts', newApiPosts)
+
+    logger.debug('newApiPosts:', newApiPosts)
     return newApiPosts
 }
 
@@ -498,9 +536,9 @@ function insertPost(postData, threadID, trans) {
                 })
             }
         })
-        .catch( (err) => {
-            logger.error(err)
-        })
+        // .catch( (err) => {
+        //     logger.error(err)
+        // })
     } else {
         logger.debug(`Post ${postData.no} has no image`)
         mediaID = null// We don't have media for this post, so use null
@@ -546,14 +584,15 @@ function insertPostFinal (postData, threadID, mediaID, trans) {
         media_size: postData.fsize,//TODO
         media_hash: postData.md5,//TODO
         media_orig: null,//TODO
+        deleted: (postData.deleted),
         },
         {transaction: trans}
     ).then( (postCreatePostResult) =>{
         logger.trace('postCreatePostResult ',postCreatePostResult)
     })
-    .catch( (err) => {
-        logger.error(err)
-    })
+    // .catch( (err) => {
+    //     logger.error(err)
+    // })
 }
 
 
