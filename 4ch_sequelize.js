@@ -193,46 +193,33 @@ function handleWholeThreadAtOnce(siteURL, boardName, threadID) {
                     deletedPostRows = compareFindDeletedPostRows(postRows, apiPosts=threadData.posts)
                     logger.debug('deletedPostRows.length ', deletedPostRows.length)
                     // Insert posts in DB but not in API (deleted)
-                    np = Promise.all(deletedPostRows.map( (postRow) => {
+                    return np = Promise.all(deletedPostRows.map( (postRow) => {
                         postID = postRow.postNumber
                         if (postRow.deleted === 0) {
                             return markPostDeleted(postID, threadID, trans);
                         }
                     })).then( (arrayOfResults) => {
                         logger.trace('np() arrayOfResults', arrayOfResults)
-                    })
-                    .catch( (err) => {
-                        logger.error(err)
-                    })
-                    
-                    // Deal with posts in DB and in API (meh.)
-                    // TODO
-                    //updatePost(postApiData, postRow, postID, threadID, trans)
 
-                    // Find posts in not DB but in API (new)
-                    newApiPosts = compareFindNewApiPosts(postRows=postRows, apiPosts=threadData.posts)
-                    logger.debug('newApiPosts.length ', newApiPosts.length)
-                    // Update posts in not DB but in API (new)
-                    dp = Promise.all(newApiPosts.map( (postRow) => {
-                        return insertPost(postRow, threadID, trans);
-                    })).then( (arrayOfResults) => {
-                        logger.trace('dp() arrayOfResults', arrayOfResults)
+                        // Deal with posts in DB and in API (meh.)
+                        // TODO
+                        //updatePost(postApiData, postRow, postID, threadID, trans)
+
+                        // Find posts in not DB but in API (new)
+                        newApiPosts = compareFindNewApiPosts(postRows=postRows, apiPosts=threadData.posts)
+                        logger.debug('newApiPosts.length ', newApiPosts.length)
+                        // Update posts in not DB but in API (new)
+                        return dp = Promise.all(newApiPosts.map( (postRow) => {
+                            return insertPost(postRow, threadID, trans);
+                        })).then( (arrayOfResults) => {
+                            return logger.trace('dp() arrayOfResults', arrayOfResults)
+                        })    
                     })
-                    .catch( (err) => {
-                        logger.error(err)
-                    })
-                    return
-                })
-                .then( (result) => {
-                    return trans.commit()
-                })
-                .catch( (err) => {
-                    logger.error(err)
                 })
             })
-            .catch( (err) => {
-                logger.error(err)
-            })
+        })
+        .then( (result) => {
+            return trans.commit()
         })
     })
     .then( (result) => {
