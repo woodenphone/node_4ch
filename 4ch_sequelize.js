@@ -31,22 +31,22 @@ const db = require('./4ch_sequelize_database.js')// DB schema and setup
 
 
 
-const siteURL = 'https://a.4cdn.org'
-const boardName = 'g'
+const global_siteURL = 'https://a.4cdn.org'
+const global_boardName = 'g'
 const global_threadID = '66770725'
 
 
-// var testThreadData = jsonFile.readFileSync('git_ignored\\test_thread.json');
-// logger.log('info', 'testThreadData', {'testThreadData':testThreadData})
-// var testThreadID = testThreadData.posts[0].no// TODO Find safer way to generate threadID
-// var testPostData = testThreadData.posts[0]
-// console.log('testPostData', testPostData)
+// var global_testThreadData = jsonFile.readFileSync('git_ignored\\test_thread.json');
+// logger.log('info', 'global_testThreadData', {'global_testThreadData':global_testThreadData})
+// varglobal_ testThreadID = global_testThreadData.posts[0].no// TODO Find safer way to generate threadID
+// var global_testPostData = global_testThreadData.posts[0]
+// console.log('global_testPostData', global_testPostData)
 
 
 
 // // A post for testing
-// testThreadID = 66564526
-// testPostData = {
+// global_testThreadID = 66564526
+// global_testPostData = {
 //     "no":66564526,
 //     "closed":1,
 //     "now":"07\/01\/18(Sun)00:45:53",
@@ -74,7 +74,7 @@ const global_threadID = '66770725'
 //     "tail_size":50
 // }
 
-const threadIds = [
+const global_threadIds = [
     '66564526',
     '66770725',
     '66803850',
@@ -86,11 +86,11 @@ const threadIds = [
 // force: true will drop the table if it already exists
 db.Post.sync({ force: false }).then(db.Image.sync({ force: false })).then(db.Thread.sync({ force: false }))
 // Insert a thread
-// .then(handleThreadData(testThreadData))
-// .then(decideThenInsertPost(testPostData))
-// .then(handleThread(siteURL, boardName, global_threadID))
-// .then(handleWholeThreadAtOnce(siteURL, boardName, global_threadID))
-.then(handleMultipleThreadsSequentially(siteURL, boardName, threadIds))
+// .then(handleThreadData(global_testThreadData))
+// .then(decideThenInsertPost(global_testPostData))
+// .then(handleThread(global_siteURL, global_boardName, global_threadID))
+// .then(handleWholeThreadAtOnceglobal_(siteURL, global_boardName, global_threadID))
+.then(handleMultipleThreadsSequentially(global_siteURL, global_boardName, global_threadIds))
 .catch( (err) => {
     logger.error(err)
 });
@@ -116,8 +116,8 @@ function isPostSticky(postData) {
     return (postData.sticky == 1)
 }
 
-function isPostOP(postData,threadID){
-    return (postData.no == threadID)
+function isPostOP(postData,threadId){
+    return (postData.no == threadId)
 }
 
 function isPostLocked(postData) {
@@ -153,11 +153,11 @@ function fetchApiJson(url) {
     })
 }
 
-function handleWholeThreadAtOnce(siteURL, boardName, threadID) {
+function handleWholeThreadAtOnce(siteURL, boardName, threadId) {
     // Load a thread from the API; lookup all its posts at once; insert new posts; update existing posts
     return db.sequelize.transaction().then( (trans) => {
         // Generate API URL
-        var threadURL = `${siteURL}/${boardName}/thread/${threadID}.json`
+        var threadURL = `${siteURL}/${boardName}/thread/${threadId}.json`
         logger.info('processing thread: ',threadURL)
         // Load thread API URL
         return fetchApiJson(threadURL)
@@ -167,24 +167,24 @@ function handleWholeThreadAtOnce(siteURL, boardName, threadID) {
             // Process thread data
             // Extract thread-level data from OP
             var opPostData = threadData.posts[0]
-            var threadID = opPostData.no
+            var threadId = opPostData.no
             // Lookup threadID in the DB
             return db.Thread.findOne(
                 {
                 where:  {
-                    threadNumber: threadID,
+                    threadNumber: threadId,
                     }
                 },
                 {transaction: trans}
             ).then( (threadRow) => {
                 if (threadRow) {
-                    logger.debug('Thread already in DB: ', threadID)
+                    logger.debug('Thread already in DB: ', threadId)
                     return
                 } else {
-                    logger.debug('Creating entry for thread: ', threadID)
+                    logger.debug('Creating entry for thread: ', threadId)
                     // Create entry for thread
                     return db.Thread.create({
-                        threadNumber: threadID,
+                        threadNumber: threadId,
                         time_op: opPostData.time,//TODO
                         time_last: getThreadTimeLast(threadData),//TODO
                         time_bump: getThreadTimeLastBumped(threadData),//TODO find better way of calculating this value
@@ -209,7 +209,7 @@ function handleWholeThreadAtOnce(siteURL, boardName, threadID) {
                 return db.Post.findAll(
                     {
                     where:  {
-                        thread_num: threadID,
+                        thread_num: threadId,
                         }
                     },
                     {transaction: trans}
@@ -226,21 +226,21 @@ function handleWholeThreadAtOnce(siteURL, boardName, threadID) {
                     return np = Promise.all(deletedPostRows.map( (postRow) => {
                         postID = postRow.postNumber
                         if (postRow.deleted === 0) {
-                            return markPostDeleted(postID, threadID, trans);
+                            return markPostDeleted(postID, threadId, trans);
                         }
                     })).then( (arrayOfResults) => {
                         logger.trace('np() arrayOfResults', arrayOfResults)
 
                         // Deal with posts in DB and in API (meh.)
                         // TODO
-                        //updatePost(postApiData, postRow, postID, threadID, trans)
+                        //updatePost(postApiData, postRow, postID, threadId, trans)
 
                         // Find posts in not DB but in API (new)
                         newApiPosts = compareFindNewApiPosts(postRows=postRows, apiPosts=threadData.posts)
                         logger.debug('newApiPosts.length ', newApiPosts.length)
                         // Update posts in not DB but in API (new)
                         return dp = Promise.all(newApiPosts.map( (postRow) => {
-                            return insertPost(postRow, threadID, trans);
+                            return insertPost(postRow, threadId, trans);
                         })).then( (arrayOfResults) => {
                             return logger.trace('dp() arrayOfResults', arrayOfResults)
                         })    
@@ -267,7 +267,7 @@ function handleWholeThreadAtOnce(siteURL, boardName, threadID) {
     })
     .then( (result) => {
         logger.debug('transaction result:', result)
-        logger.info('Proccessed threadID', threadID)
+        logger.info('Proccessed threadId', threadId)
     })
     .catch( (err) => {
         logger.error(err)
@@ -275,9 +275,9 @@ function handleWholeThreadAtOnce(siteURL, boardName, threadID) {
     })
 }
 
-function updatePost(postApiData, postRow, postID, threadID, trans) {// TODO
-    logger.debug('postID, threadID: ', postID, threadID)
-    logger.silly('updatePost(): ', postApiData, postRow, postID, threadID)
+function updatePost(postApiData, postRow, postID, threadId, trans) {// TODO
+    logger.debug('postID, threadId: ', postID, threadId)
+    logger.silly('updatePost(): ', postApiData, postRow, postID, threadId)
     // Test if data for a post has changed and if so, deal with updating it.
     
     // Test values to update
@@ -292,13 +292,13 @@ function updatePost(postApiData, postRow, postID, threadID, trans) {// TODO
     return db.Post.update(values, {
         where: {
             post_number: postID,
-            thread_num: threadID
+            thread_num: threadId
             }
         },
         {transaction: trans}
     )
     .then( (result) => {
-        logger.debug('Successfully updated post:', postID, threadID)
+        logger.debug('Successfully updated post:', postID, threadId)
         logger.silly('success, result: ', result)
     })
     .catch( (err) => {
@@ -306,16 +306,16 @@ function updatePost(postApiData, postRow, postID, threadID, trans) {// TODO
     })
 }
 
-function markPostDeleted(postID, threadID, trans) {
+function markPostDeleted(postID, threadId, trans) {
     // Mark a given post as deleted
-    logger.debug('postID, threadID: ', postID, threadID)
+    logger.debug('postID, threadId: ', postID, threadId)
     db.Post.update(
         {
             deleted: 1,
         },{
         where: {
             postNumber: postID,
-            thread_num: threadID
+            thread_num: threadId
             }
         },
         {transaction: trans}
@@ -333,8 +333,9 @@ function compareFindDeletedPostRows (postRows, apiPosts) {
         var matched = false
         for (let j = 0; j< apiPosts.length-1; j++){
             var apiPost = apiPosts[j]
-            if (dbPost.postNumber == apiPost.no) {
+            if ( String(dbPost.postNumber) === String(apiPost.no) ) {
                 matched = true// If in DB but not API
+                break// We can skip the rest of this inner loop if we already know a match occured
             }
         }
         if (matched){
@@ -370,28 +371,24 @@ function compareFindDeletedPostRows (postRows, apiPosts) {
 function compareFindNewApiPosts (postRows, apiPosts) {// WIP
     // Produce an array of 4ch API post objects that do not match any item in the given post DB rows
     logger.trace('postRows, apiPosts:', postRows, apiPosts)
-    // assert.ok( (postRows.length <= apiPosts.length) )
-    var newApiPosts = []
-
     // Format into object type for sorting
     var postRowsObj = {}
     for (var i = 0; i< postRows.length-1; i++){
         var postRow = postRows[i]
-        var postRowNumber = postRow.postNumber
+        var postRowNumber = String(postRow.postNumber)
         postRowsObj[postRowNumber] = postRow
     }
-
     // Select items that occur only apiPosts
+    var newApiPosts = []
     for (var j = 0; j< apiPosts.length-1; j++){
         var apiPost = apiPosts[j]
-        var apiPostNumber = apiPost.no
+        var apiPostNumber = String(apiPost.no)
         if ( ! (apiPostNumber in postRowsObj) ) {
             // Add to output
             var match = apiPost
             newApiPosts.push(match)
         }
     }
-
     logger.trace('newApiPosts:', newApiPosts)
     return newApiPosts
 }
@@ -399,10 +396,10 @@ function compareFindNewApiPosts (postRows, apiPosts) {// WIP
 
 
 
-// function handleThread(siteURL, boardName, threadID) {
+// function handleThread(siteURL, boardName, threadId) {
 //     // Load a thread from the API; then lookup and insert it, its posts, and its media
 //     // Generate API URL
-//     var threadURL = `${siteURL}/${boardName}/thread/${threadID}.json`
+//     var threadURL = `${siteURL}/${boardName}/thread/${threadId}.json`
 //     logger.info('handleThread() processing thread: ',threadURL)
 //     // Load thread API URL
 //     rp(threadURL)
@@ -422,24 +419,24 @@ function compareFindNewApiPosts (postRows, apiPosts) {// WIP
 //     return db.sequelize.transaction( (trans) => {
 //         // Extract thread-level data from OP
 //         var opPostData = threadData.posts[0]
-//         var threadID = opPostData.no
-//         // Lookup threadID in the DB
+//         var threadId = opPostData.no
+//         // Lookup threadId in the DB
 //         return db.Thread.findOne(
 //             {
 //             where:  {
-//                 threadNumber: threadID,
+//                 threadNumber: threadId,
 //                 }
 //             },
 //             {transaction: trans}
 //         ).then( (threadRow) => {
 //             if (threadRow) {
-//                 logger.debug('Thread already in DB: ', threadID)
+//                 logger.debug('Thread already in DB: ', threadId)
 //                 // TODO Update thread entry
 //             } else {
-//                 logger.debug('Creating entry for thread: ', threadID)
+//                 logger.debug('Creating entry for thread: ', threadId)
 //                 // Create entry for thread
 //                 return db.Thread.create({
-//                     threadNumber: threadID,
+//                     threadNumber: threadId,
 //                     time_op: opPostData.time,//TODO
 //                     time_last: getThreadTimeLast(threadData),//TODO
 //                     time_bump: getThreadTimeLastBumped(threadData),//TODO find better way of calculating this value
@@ -460,33 +457,33 @@ function compareFindNewApiPosts (postRows, apiPosts) {// WIP
 //                 })
 //             }
 //         }).then( () => {
-//             return iterateThreadPosts(threadData, threadID, trans)
+//             return iterateThreadPosts(threadData, threadId, trans)
 //         })
 //         .catch( (err) => {
 //             logger.error(err)
 //         })
 //     })
 //     .then( (result) => {
-//         logger.debug('Transaction finished: ', threadID, result)
+//         logger.debug('Transaction finished: ', threadId, result)
 //     })
 //     .catch( (err) =>{
 //         logger.error(err)
 //     })
 // }
 
-// function iterateThreadPosts(threadData, threadID, trans) {
+// function iterateThreadPosts(threadData, threadId, trans) {
 //     // Check the DB for posts and insert them and their media if absent
 //     logger.trace('Iterating over test thread:',threadData)
 //     lupus(0, threadData.posts.length, (n) => {
 //         logger.trace('processing post index:', n)
 //         var postData = threadData.posts[n]
-//         decideThenInsertPost(postData, threadID, trans)
+//         decideThenInsertPost(postData, threadId, trans)
 //     }, () => {
 //         logger.trace('finished lupus loop')
 //     })
 // }
 
-// function decideThenInsertPost (postData, threadID, trans) {
+// function decideThenInsertPost (postData, threadId, trans) {
 //     // Check the DB for a post and insert it and its media if absent
 //     logger.debug('decideThenInsertPost() postData.no:', postData.no)
 //     // Does post exist in DB?
@@ -494,7 +491,7 @@ function compareFindNewApiPosts (postRows, apiPosts) {// WIP
 //         {
 //         where:  {
 //             postNumber: postData.no,
-//             thread_num: threadID,
+//             thread_num: threadId,
 //         }
 //         },
 //         {transaction: trans}
@@ -504,7 +501,7 @@ function compareFindNewApiPosts (postRows, apiPosts) {// WIP
 //             logger.debug(`Post ${existingVersionOfPost.postNumber} is already in the DB`)
 //         } else {
 //             logger.debug('Post is not in the DB')
-//             return insertPost(postData, threadID, trans)
+//             return insertPost(postData, threadId, trans)
 //         }
 //     })
 //     .catch( (err) => {
@@ -512,7 +509,7 @@ function compareFindNewApiPosts (postRows, apiPosts) {// WIP
 //     })
 // }
 
-function insertPost(postData, threadID, trans) {
+function insertPost(postData, threadId, trans) {
     // Insert a post without looking at the DB first
     logger.debug('postData.no', postData.no)
     // logger.debug('Post is not in the DB')
@@ -530,9 +527,9 @@ function insertPost(postData, threadID, trans) {
             if (existingVersionOfImageRow) {
                 logger.debug('Image is already in the DB')
                 // If MD5 found, use that as our entry in media table
-                mediaID = existingVersionOfImageRow.id
-                logger.debug('mediaID: ', mediaID)
-                return insertPostFinal(postData, threadID, mediaID, trans)
+                var mediaId = existingVersionOfImageRow.id
+                logger.debug('mediaId: ', mediaId)
+                return insertPostFinal(postData, threadId, mediaId, trans)
             } else {
                 logger.debug(`Image ${postData.md5} is not in the DB`)
                 // If no MD5 found, create new entry in media table and use that
@@ -559,9 +556,9 @@ function insertPost(postData, threadID, trans) {
                     {transaction: trans}
                 ).then( (imageRow) => {
                     logger.trace('Image added to DB: ', imageRow)
-                    mediaID = imageRow.id
-                    logger.debug('mediaID: ', mediaID)
-                    return insertPostFinal(postData, threadID, mediaID, trans)
+                    var mediaId = imageRow.id
+                    logger.debug('mediaId: ', mediaId)
+                    return insertPostFinal(postData, threadId, mediaId, trans)
                 })
                 // .catch( (err) => {
                 //     logger.error(err)
@@ -573,9 +570,9 @@ function insertPost(postData, threadID, trans) {
         // })
     } else {
         logger.debug(`Post ${postData.no} has no image`)
-        mediaID = null// We don't have media for this post, so use null
-        logger.trace('mediaID: ', mediaID)
-        return insertPostFinal (postData, threadID, mediaID, trans)
+        var mediaId = null// We don't have media for this post, so use null
+        logger.trace('mediaId: ', mediaId)
+        return insertPostFinal (postData, threadId, mediaId, trans)
     }
 }
 
@@ -594,18 +591,18 @@ function downloadMedia(url, filepath) {
     })
 }
 
-function insertPostFinal (postData, threadID, mediaID, trans) {
+function insertPostFinal (postData, threadId, mediaId, trans) {
     // Insert the post's data
     logger.debug('Inserting post data')
     return db.Post.create({
         postNumber: postData.no,
-        thread_num: threadID,
+        thread_num: threadId,
         name: postData.name,
         title: postData.sub,
         comment: postData.com,
-        op: isPostOP(postData,threadID),
+        op: isPostOP(postData,threadId),
         timestamp: postData.time,
-        media_id: mediaID,
+        media_id: mediaId,
         spoiler: isPostSpoiler(postData),
         preview_orig: null,//TODO
         preview_w: postData.tn_w,//TODO
