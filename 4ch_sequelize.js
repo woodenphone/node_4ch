@@ -10,7 +10,7 @@ const rp_errors = require('request-promise/errors');
 const request = require('request');// for file streaming
 const assert = require('assert');
 var RateLimiter = require('limiter').RateLimiter;
-var limiter = new RateLimiter(1, 1000);
+var limiter = new RateLimiter(1, 1500);// MUST be above 1000
 
 // Setup logging
 const tracer = require('tracer')
@@ -33,7 +33,7 @@ const db = require('./4ch_sequelize_database.js')// DB schema and setup
 
 const siteURL = 'https://a.4cdn.org'
 const boardName = 'g'
-const threadID = '66770725'
+const global_threadID = '66770725'
 
 
 // var testThreadData = jsonFile.readFileSync('git_ignored\\test_thread.json');
@@ -74,7 +74,12 @@ const threadID = '66770725'
 //     "tail_size":50
 // }
 
-
+const threadIds = [
+    '66564526',
+    '66770725',
+    '66803850',
+    '66822790',
+]
 
 
 // Create tables
@@ -83,11 +88,26 @@ db.Post.sync({ force: false }).then(db.Image.sync({ force: false })).then(db.Thr
 // Insert a thread
 // .then(handleThreadData(testThreadData))
 // .then(decideThenInsertPost(testPostData))
-// .then(handleThread(siteURL, boardName, threadID))
-.then(handleWholeThreadAtOnce(siteURL, boardName, threadID))
+// .then(handleThread(siteURL, boardName, global_threadID))
+// .then(handleWholeThreadAtOnce(siteURL, boardName, global_threadID))
+.then(handleMultipleThreadsSequentially(siteURL, boardName, threadIds))
 .catch( (err) => {
     logger.error(err)
 });
+
+
+
+
+function handleMultipleThreadsSequentially(siteURL, boardName, threadIds) {
+    // Iterate over an array of threadIDs
+    logger.debug('processing threads: ',threadIds)
+    for (var i = 0; i< threadIds.length; i++){
+        threadId = threadIds[i]
+        handleWholeThreadAtOnce(siteURL, boardName, threadId)
+    }
+    logger.debug('Finished processing threads.')
+}
+
 
 // Functions that check if a post is something
 function isPostSticky(postData) {
@@ -122,7 +142,16 @@ function getThreadTimeLast(threadData) {
 }
 // /Functions that check something about a thread
 
-
+function fetchApiJson(url) {
+    // Ratelimit API use
+    return new Promise( (resolve, reject) => {
+        logger.debug('Loading API URL: ', url)
+        limiter.removeTokens(1, function() {
+            logger.trace('Limiter fired.')
+            resolve(rp(url))
+        })
+    })
+}
 
 function handleWholeThreadAtOnce(siteURL, boardName, threadID) {
     // Load a thread from the API; lookup all its posts at once; insert new posts; update existing posts
@@ -131,7 +160,8 @@ function handleWholeThreadAtOnce(siteURL, boardName, threadID) {
         var threadURL = `${siteURL}/${boardName}/thread/${threadID}.json`
         logger.info('processing thread: ',threadURL)
         // Load thread API URL
-        return rp(threadURL).then( (htmlString) => {
+        return fetchApiJson(threadURL)
+        .then( (htmlString) => {
             // Decode JSON
             threadData = JSON.parse(htmlString)
             // Process thread data
@@ -219,14 +249,27 @@ function handleWholeThreadAtOnce(siteURL, boardName, threadID) {
             })
         })
         .then( (result) => {
+            logger.debug('result:', result)
             return trans.commit()
+        })
+        .catch( (err) => {     
+            if (err.statusCode === 404) {
+                logger.error('404 for threadURL', threadURL)
+                trans.rollback()
+                return
+            } else {
+                logger.error(err)
+                throw(err)
+            }
         })
     })
     .then( (result) => {
         logger.debug('transaction result:', result)
+        logger.info('Proccessed threadID', threadID)
     })
     .catch( (err) => {
         logger.error(err)
+        throw(err)
     })
 }
 
@@ -324,8 +367,8 @@ function compareFindDeletedPostRows (postRows, apiPosts) {
 
 function compareFindNewApiPosts (postRows, apiPosts) {// WIP
     // Produce an array of 4ch API post objects that do not match any item in the given post DB rows
-    logger.debug('postRows, apiPosts:', postRows, apiPosts)
-    assert.ok( (postRows.length <= apiPosts.length) )
+    logger.trace('postRows, apiPosts:', postRows, apiPosts)
+    // assert.ok( (postRows.length <= apiPosts.length) )
     var newApiPosts = []
 
     // Format into object type for sorting
@@ -347,7 +390,7 @@ function compareFindNewApiPosts (postRows, apiPosts) {// WIP
         }
     }
 
-    logger.debug('newApiPosts:', newApiPosts)
+    logger.trace('newApiPosts:', newApiPosts)
     return newApiPosts
 }
 
@@ -518,9 +561,9 @@ function insertPost(postData, threadID, trans) {
                     logger.debug('mediaID: ', mediaID)
                     return insertPostFinal(postData, threadID, mediaID, trans)
                 })
-                .catch( (err) => {
-                    logger.error(err)
-                })
+                // .catch( (err) => {
+                //     logger.error(err)
+                // })
             }
         })
         // .catch( (err) => {
@@ -536,15 +579,15 @@ function insertPost(postData, threadID, trans) {
 
 function downloadMedia(url, filepath) {
     // Save a target URL to a target path
-    logger.debug('Saving URL: ', url, 'to filepath: ',filepath)
+    logger.trace('before limiter; url, filepath: ', url, filepath)
     limiter.removeTokens(1, function() {
-        logger.trace('Limiter fired.')
+        logger.debug('Saving URL: ', url, 'to filepath: ',filepath)
         // return
         request.get(url)
         .on('error', function(err) {
             logger.error('err', err)
             console.log('downloadMedia() err ',err)
-            raise(err)
+            throw(err)
         }).pipe(fs.createWriteStream(filepath))
     })
 }

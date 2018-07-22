@@ -121,14 +121,14 @@ const Post = sequelize.define('post', {
     postNumber: {
         type: Sequelize.INTEGER,
         allowNull: false,
-        unique: 'PostNumberAndThreadNumberUniqueIndex'
+        unique: 'PostNumberAndThreadNumberUniqueIndex'// This is to ensure that only one entry has a conbination of threadID.PostID
     },
     thread_num: {
         type: Sequelize.INTEGER,
         allowNull: false,
-        unique: 'PostNumberAndThreadNumberUniqueIndex'
-        // model: Thread,// Foreign key
-        // key: 'threadNumber'// Foreign key
+        unique: 'PostNumberAndThreadNumberUniqueIndex',// This is to ensure that only one entry has a conbination of threadID.PostID
+        model: Thread,// Foreign key threads.threadNumber
+        key: 'threadNumber',// Foreign key threads.threadNumber
     },
     name: {
         type: Sequelize.TEXT
