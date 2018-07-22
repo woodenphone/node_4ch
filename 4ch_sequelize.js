@@ -33,7 +33,7 @@ const db = require('./4ch_sequelize_database.js')// DB schema and setup
 
 const global_siteURL = 'https://a.4cdn.org'
 const global_boardName = 'g'
-const global_threadID = '66770725'
+//const global_threadID = '66770725'
 
 
 // var global_testThreadData = jsonFile.readFileSync('git_ignored\\test_thread.json');
@@ -74,6 +74,7 @@ const global_threadID = '66770725'
 //     "tail_size":50
 // }
 
+global_threadID = '66770725'
 const global_threadIds = [
     '66564526',
     '66770725',
@@ -89,8 +90,8 @@ db.Post.sync({ force: false }).then(db.Image.sync({ force: false })).then(db.Thr
 // .then(handleThreadData(global_testThreadData))
 // .then(decideThenInsertPost (postData, threadId, trans, boardName))
 // .then(handleThread(global_siteURL, global_boardName, global_threadID))
-// .then(handleWholeThreadAtOnceglobal_(siteURL, global_boardName, global_threadID))
-.then(handleMultipleThreadsSequentially(global_siteURL, global_boardName, global_threadIds))
+.then(handleWholeThreadAtOnce( global_siteURL, global_boardName, global_threadID ) )
+// .then(handleMultipleThreadsSequentially(global_siteURL, global_boardName, global_threadIds))
 .catch( (err) => {
     logger.error(err)
 });
@@ -98,14 +99,15 @@ db.Post.sync({ force: false }).then(db.Image.sync({ force: false })).then(db.Thr
 
 
 
-function handleMultipleThreadsSequentially(siteURL, boardName, threadIds) {
+async function handleMultipleThreadsSequentially(siteURL, boardName, threadIds) {
     // Iterate over an array of threadIDs
     logger.debug('processing threads: ',threadIds)
     for (var i = 0; i< threadIds.length; i++){
         var threadId = threadIds[i]
-        handleWholeThreadAtOnce(siteURL, boardName, threadId)
+        await handleWholeThreadAtOnce(siteURL, boardName, threadId)
     }
     logger.debug('Finished processing threads.')
+    return
 }
 
 
@@ -153,7 +155,7 @@ function fetchApiJson(url) {
     })
 }
 
-function handleWholeThreadAtOnce(siteURL, boardName, threadId) {
+async function handleWholeThreadAtOnce(siteURL, boardName, threadId) {
     // Load a thread from the API; lookup all its posts at once; insert new posts; update existing posts
     return db.sequelize.transaction().then( (trans) => {
         // Generate API URL
@@ -238,6 +240,7 @@ function handleWholeThreadAtOnce(siteURL, boardName, threadId) {
                         // Find posts in not DB but in API (new)
                         var newApiPosts = compareFindNewApiPosts(postRows=postRows, apiPosts=threadData.posts)
                         logger.debug('newApiPosts.length ', newApiPosts.length)
+                        logger.debug('newApiPosts ', newApiPosts)
                         // Update posts in not DB but in API (new)
                         return dp = Promise.all(newApiPosts.map( (postRow) => {
                             return insertPost(postRow, threadId, trans, boardName);
@@ -367,30 +370,44 @@ function compareFindDeletedPostRows (postRows, apiPosts) {
 // }
 
 
+
+
 function compareFindNewApiPosts (postRows, apiPosts) {// WIP
     // Produce an array of 4ch API post objects that do not match any item in the given post DB rows
-    logger.trace('postRows, apiPosts:', postRows, apiPosts)
+    //logger.debug('postRows, apiPosts:', postRows, apiPosts)
     // Format into object type for sorting
-    var postRowsObj = {}
-    for (var i = 0; i< postRows.length-1; i++){
-        var postRow = postRows[i]
-        var postRowNumber = String(postRow.postNumber)
-        postRowsObj[postRowNumber] = postRow
-    }
+    const postRowsObj = buildObjFromArray (arrayIn=postRows, itemKey='postNumber')
+    const apiPostsObj = buildObjFromArray (arrayIn=postRows, itemKey='no')
     // Select items that occur only apiPosts
     var newApiPosts = []
-    for (var j = 0; j< apiPosts.length-1; j++){
+    for (var j = 0; j< apiPosts.length; j++){
         var apiPost = apiPosts[j]
-        var apiPostNumber = String(apiPost.no)
-        if ( ! (apiPostNumber in postRowsObj) ) {
-            // Add to output
+        var isMatch = isitemInobj(obj=postRowsObj, itemName=String(apiPost.no))
+        if ( ! isMatch ) {
+            // Add to output if does not match
             var match = apiPost
             newApiPosts.push(match)
         }
     }
-    logger.trace('newApiPosts:', newApiPosts)
+    logger.debug('newApiPosts:', newApiPosts)
     return newApiPosts
 }
+
+function buildObjFromArray (arrayIn, itemKey) {
+    var obj = {}
+    for (var k = 0; k< arrayIn.length; k++){
+        var item = arrayIn[k]
+        var itemKeyString = String(item[itemKey])
+        obj[itemKeyString] = item
+    }
+    return obj
+}
+
+function isitemInobj(obj, itemName) {
+    var inObj = ( itemName in obj )
+    return inObj
+}
+
 
 
 
