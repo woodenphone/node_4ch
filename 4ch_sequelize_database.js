@@ -30,6 +30,15 @@ sequelize
         console.error('Unable to connect to the database:', err);
     });
 
+// Define Board columns
+const Board = sequelize.define('board', {
+    name: {
+        type: Sequelize.TEXT,
+        allowNull: false,
+        unique: 'BoardNameUniqueIndex',
+    },
+});
+
 // Define media columns
 const Image = sequelize.define('image', {
     // media_id: {
