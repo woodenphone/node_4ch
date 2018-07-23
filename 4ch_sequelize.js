@@ -100,17 +100,18 @@ db.Post.sync({ force: false }).then(db.Image.sync({ force: false })).then(db.Thr
 
 function handleThreads(siteURL, boardName) {
     // 
-    logger.debug('Processing threads for board: ',boardName)
+    logger.debug('Processing threads.json for board: ',boardName)
     var threadsUrl = `${siteURL}/${boardName}/threads.json`
     fetchApiJson(threadsUrl)
     .then( (apiThreads) =>{
     logger.debug('apiThreads: ',apiThreads)
-    // get a list threadIds
-    var threadsList = joinApiThreadsLists(apiThreads)
-    logger.debug('threadsList: ',threadsList)
+    // get a list of threadIds
+    // var threadsList = joinApiThreadsLists(apiThreads)
+    // logger.debug('threadsList: ',threadsList)
     var threadIds = joinApiThreadsListsIds(apiThreads)
     logger.debug('threadIds: ',threadIds)
     handleMultipleThreadsSequentially(siteURL, boardName, threadIds)
+    logger.debug('Finished processing threads.json for board: ',boardName)
     })
 }
 

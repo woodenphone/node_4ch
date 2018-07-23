@@ -134,6 +134,11 @@ const Thread = sequelize.define('thread', {
         allowNull: false,
         defaultValue: false,
     },
+    media_done: {// False if media downloader has not handled the post yet. True otherwise.
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+    },
 });
 
 // Define post columns
