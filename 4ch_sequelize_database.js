@@ -64,13 +64,13 @@ const Image = sequelize.define('image', {
         unique: 'MediaHashUniqueIndex',
     },
     media: {
-        type: Sequelize.TEXT
+        type: Sequelize.TEXT,
     },
     preview_op: {
-        type: Sequelize.TEXT
+        type: Sequelize.TEXT,
     },
     preview_reply: {
-        type: Sequelize.TEXT
+        type: Sequelize.TEXT,
     },
     total: {
         type: Sequelize.INTEGER,
@@ -85,7 +85,7 @@ const Image = sequelize.define('image', {
 
 // Define thread columns
 const Thread = sequelize.define('thread', {
-    threadNumber: {
+    threadNumber: {// Thread number is also post number of OP
         type: Sequelize.INTEGER,
         allowNull: false,
         unique: 'ThreadNumberUniqueIndex',
@@ -134,11 +134,6 @@ const Thread = sequelize.define('thread', {
         allowNull: false,
         defaultValue: false,
     },
-    media_done: {// False if media downloader has not handled the post yet. True otherwise.
-        type: Sequelize.BOOLEAN,
-        allowNull: false,
-        defaultValue: false,
-    },
 });
 
 // Define post columns
@@ -148,7 +143,7 @@ const Post = sequelize.define('post', {
         allowNull: false,
         unique: 'PostNumberAndThreadNumberUniqueIndex'// This is to ensure that only one entry has a conbination of threadID.PostID
     },
-    thread_num: {
+    thread_num: {// Thread number is also post number of OP
         type: Sequelize.INTEGER,
         allowNull: false,
         unique: 'PostNumberAndThreadNumberUniqueIndex',// This is to ensure that only one entry has a conbination of threadID.PostID
@@ -156,16 +151,16 @@ const Post = sequelize.define('post', {
         key: 'threadNumber',// Foreign key threads.threadNumber
     },
     name: {
-        type: Sequelize.TEXT
+        type: Sequelize.TEXT,
     },
     trip: {
-        type: Sequelize.TEXT
+        type: Sequelize.TEXT,
     },
     title: {
-        type: Sequelize.TEXT
+        type: Sequelize.TEXT,
     },
     comment: {
-        type: Sequelize.TEXT
+        type: Sequelize.TEXT,
     },
     op: {
         type: Sequelize.BOOLEAN,
@@ -177,6 +172,9 @@ const Post = sequelize.define('post', {
         allowNull: false
     },
     timestamp_expired: {
+        type: Sequelize.INTEGER,
+    },
+    tim: {
         type: Sequelize.INTEGER,
     },
     media_id: {
@@ -191,7 +189,7 @@ const Post = sequelize.define('post', {
         defaultValue: false
     },
     preview_orig: {
-        type: Sequelize.TEXT
+        type: Sequelize.TEXT,
     },
     preview_w: {
         type: Sequelize.INTEGER,
@@ -204,7 +202,10 @@ const Post = sequelize.define('post', {
         defaultValue: 0
     },
     media_filename: {
-        type: Sequelize.TEXT
+        type: Sequelize.TEXT,
+    },
+    ext: {
+        type: Sequelize.TEXT,
     },
     media_w: {
         type: Sequelize.INTEGER,
@@ -222,7 +223,7 @@ const Post = sequelize.define('post', {
         defaultValue: 0
     },
     media_hash: {
-        type: Sequelize.TEXT
+        type: Sequelize.TEXT,
     },
     media_orig: {
         type: Sequelize.TEXT
@@ -231,6 +232,11 @@ const Post = sequelize.define('post', {
         type: Sequelize.BOOLEAN,
         allowNull: false,
         defaultValue: false
+    },
+    media_done: {// False if media downloader has not handled the post yet. True otherwise.
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
     },
 });
 

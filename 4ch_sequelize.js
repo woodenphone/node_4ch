@@ -104,13 +104,14 @@ function handleThreads(siteURL, boardName) {
     var threadsUrl = `${siteURL}/${boardName}/threads.json`
     fetchApiJson(threadsUrl)
     .then( (apiThreads) =>{
-    logger.debug('apiThreads: ',apiThreads)
+    logger.trace('apiThreads: ',apiThreads)
     // get a list of threadIds
     // var threadsList = joinApiThreadsLists(apiThreads)
     // logger.debug('threadsList: ',threadsList)
     var threadIds = joinApiThreadsListsIds(apiThreads)
-    logger.debug('threadIds: ',threadIds)
-    handleMultipleThreadsSequentially(siteURL, boardName, threadIds)
+    logger.trace('threadIds: ',threadIds)
+    // handleMultipleThreadsSequentially(siteURL, boardName, threadIds)
+    handleMultipleThreadsSequentiallyWithMediaAlso(siteURL, boardName, threadIds)
     logger.debug('Finished processing threads.json for board: ',boardName)
     })
 }
@@ -147,7 +148,7 @@ function joinApiThreadsListsIds (apiThreads) {
 
 async function handleMultipleThreadsSequentially(siteURL, boardName, threadIds) {
     // Iterate over an array of threadIDs
-    logger.debug('processing threads: ',threadIds)
+    // logger.debug('processing threads: ',threadIds)
     for (var i = 0; i< threadIds.length; i++){
         var threadId = threadIds[i]
         await handleWholeThreadAtOnce(siteURL, boardName, threadId)
@@ -156,6 +157,17 @@ async function handleMultipleThreadsSequentially(siteURL, boardName, threadIds) 
     return
 }
 
+async function handleMultipleThreadsSequentiallyWithMediaAlso(siteURL, boardName, threadIds) {
+    // Iterate over an array of threadIDs but also process some media
+    // logger.debug('processing threads: ',threadIds)
+    for (var i = 0; i< threadIds.length; i++){
+        var threadId = threadIds[i]
+        await handleWholeThreadAtOnce(siteURL, boardName, threadId)
+        await handleSomeMedia()
+    }
+    logger.debug('Finished processing threads.')
+    return
+}
 
 // Functions that check if a post is something
 function isPostSticky(postData) {
@@ -289,7 +301,7 @@ async function handleWholeThreadAtOnce(siteURL, boardName, threadId) {
                         // Find posts in not DB but in API (new)
                         var newApiPosts = compareFindNewApiPosts(postRows=postRows, apiPosts=threadData.posts)
                         logger.debug('newApiPosts.length ', newApiPosts.length)
-                        logger.debug('newApiPosts ', newApiPosts)
+                        // logger.debug('newApiPosts ', newApiPosts)
                         // Update posts in not DB but in API (new)
                         return dp = Promise.all(newApiPosts.map( (postRow) => {
                             return insertPost(postRow, threadId, trans, boardName);
@@ -359,7 +371,7 @@ function updatePost(postApiData, postRow, postID, threadId, trans) {// TODO
 
 function markPostDeleted(postID, threadId, trans) {
     // Mark a given post as deleted
-    logger.debug('postID, threadId: ', postID, threadId)
+    logger.debug('Marking post as deleted: postID, threadId: ', postID, threadId)
     db.Post.update(
         {
             deleted: 1,
@@ -419,8 +431,6 @@ function compareFindDeletedPostRows (postRows, apiPosts) {
 // }
 
 
-
-
 function compareFindNewApiPosts (postRows, apiPosts) {// WIP
     // Produce an array of 4ch API post objects that do not match any item in the given post DB rows
     //logger.debug('postRows, apiPosts:', postRows, apiPosts)
@@ -438,7 +448,7 @@ function compareFindNewApiPosts (postRows, apiPosts) {// WIP
             newApiPosts.push(match)
         }
     }
-    logger.debug('newApiPosts:', newApiPosts)
+    // logger.debug('newApiPosts:', newApiPosts)
     return newApiPosts
 }
 
@@ -588,66 +598,141 @@ function insertPost(postData, threadId, trans, boardName) {
             },
             {transaction: trans}
         )
-        .then( (existingVersionOfImageRow) => {
-            logger.trace('imgTest existingVersionOfImageRow', existingVersionOfImageRow)
-            if (existingVersionOfImageRow) {
+        .then( (md5SearchRow) => {
+            logger.trace('imgTest md5SearchRow', md5SearchRow)
+            if (md5SearchRow) {
                 logger.debug('Image is already in the DB')
                 // If MD5 found, use that as our entry in media table
-                var mediaId = existingVersionOfImageRow.id
+                var mediaId = md5SearchRow.id
                 logger.debug('mediaId: ', mediaId)
-                return insertPostFinal(postData, threadId, mediaId, trans)
+                return insertPostFinal(postData, threadId, mediaId, trans, mediaDone=true)
             } else {
                 logger.debug(`Image ${postData.md5} is not in the DB`)
-                // If no MD5 found, create new entry in media table and use that
-                // Fetch the media files for the post
-                // Decide where to save each file
-                // Images: http(s)://i.4cdn.org/board/tim.ext
-                var fullURL = `https://i.4cdn.org/${boardName}/${postData.tim}${postData.ext}`
-                var fullFilePath = `debug/${boardName}/${postData.tim}${postData.ext}`
-                // Thumbnails: http(s)://i.4cdn.org/board/tims.jpg
-                var thumbURL = `https://i.4cdn.org/${boardName}/${postData.tim}s${postData.ext}`
-                var thumbFilePath = `debug/${boardName}/thumb/${postData.tim}s.jpg`
-                // Save full image
-                downloadMedia(fullURL, fullFilePath)
-                // Save thumb
-                downloadMedia(thumbURL, thumbFilePath)
-                // Insert row into Images table
-                return db.Image.create(
-                    {
-                        media_hash: postData.md5,
-                        media: fullFilePath,// TODO Verify format Asagi uses
-                        preview_op: 'local/path/to/preview_op.ext',// TODO
-                        preview_reply: thumbFilePath,// TODO Verify format Asagi uses
-                    },
-                    {transaction: trans}
-                )
-                .then( (imageRow) => {
-                    logger.trace('Image added to DB: ', imageRow)
-                    var mediaId = imageRow.id
-                    logger.debug('mediaId: ', mediaId)
-                    return insertPostFinal(postData, threadId, mediaId, trans)
-                })
-                // .catch( (err) => {
-                //     logger.error(err)
-                // })
+                return insertPostFinal(postData, threadId, mediaId = null, trans, mediaDone=false)
             }
         })
-        // .catch( (err) => {
-        //     logger.error(err)
-        // })
     } else {
         logger.debug(`Post ${postData.no} has no image`)
         var mediaId = null// We don't have media for this post, so use null
         logger.trace('mediaId: ', mediaId)
-        return insertPostFinal (postData, threadId, mediaId, trans)
+        return insertPostFinal (postData, threadId, mediaId, trans, mediaDone=true)
     }
+}
+
+
+
+async function handleSomeMedia() {//WIP
+    // SELECT * WHERE media_done = 0 ORDER BY postNumber LIMIT 100
+    logger.debug('Handling a group of media...')
+    return db.Post.findAll( 
+        {
+            where:{media_done: false},
+            // order: [
+            //     // Oldest posts first
+            //     ['postNumber', 'ASC'],
+            // ],
+            limit: 10
+        },
+    )
+    .then( (mediaTodoPostRows) => {
+        // logger.debug('mediaTodoPostRows:', mediaTodoPostRows)
+        logger.debug('mediaTodoPostRows.length: ', mediaTodoPostRows.length)
+        // For each unprocessed post, handle the media
+        for (var i = 0; i< mediaTodoPostRows.length; i++){
+            mediaTodoPostRow = mediaTodoPostRows[i]
+            handlePostMedia(mediaTodoPostRow)
+        }
+    })
+    .then( () => {
+        logger.debug('Finished handling this group of media')
+    })
+    .catch( (err) => {
+        logger.error(err)
+    })
+}
+
+async function handlePostMedia(postRow) {//WIP
+    // See if post even needs media processing by checking if it has post.md5 set
+    logger.debug('handlePostMedia()')
+    // logger.debug('postRow:', postRow)
+    var postId = postRow.post_number
+    var threadId = postRow.thread_num
+    // Lookup md5 to see if we can skip downloading
+    var md5 = postRow.media_hash
+    logger.debug('md5:', md5)
+    return db.Image.findOne(
+        {
+            where:{media_hash: md5}
+        },
+    )
+    .then( (md5SearchRow) => {
+        // logger.debug('md5SearchRow:', md5SearchRow)
+        if (md5SearchRow) {
+            logger.debug('Image is already in the DB')
+            // If MD5 found, use that as our entry in media table
+            var mediaId = md5SearchRow.id
+            updatePostMediaId(postId, threadId, mediaId)
+        } else {
+            // Fetch the media files for the post
+            // Decide where to save each file
+            // Images: http(s)://i.4cdn.org/board/tim.ext
+            var fullURL = `https://i.4cdn.org/${global_boardName}/${postRow.tim}${postRow.ext}`
+            var fullFilePath = `debug/${global_boardName}/${postRow.tim}${postRow.ext}`
+            // Thumbnails: http(s)://i.4cdn.org/board/tims.jpg
+            var thumbURL = `https://i.4cdn.org/${global_boardName}/${postRow.tim}s.jpg`
+            var thumbFilePath = `debug/${global_boardName}/thumb/${postRow.tim}s.jpg`
+            // Save full image
+            downloadMedia(fullURL, fullFilePath)
+            // Save thumb
+            downloadMedia(thumbURL, thumbFilePath)
+            // Insert row into Images table
+            return db.Image.create(
+                {
+                    media_hash: md5,
+                    media: fullFilePath,// TODO Verify format Asagi uses
+                    preview_op: null,//'local/path/to/preview_op.ext',// TODO
+                    preview_reply: thumbFilePath,// TODO Verify format Asagi uses
+                },
+                // {transaction: trans}
+            )
+            .then( (imageRow) => {
+                logger.debug('Image added to DB: ', imageRow)
+                var mediaId = imageRow.id
+                updatePostMediaId(postId, threadId, mediaId)
+           })
+        }
+    })
+    .then( () => {
+        logger.debug('proccessed postRow.postNumber:',postRow.postNumber)
+    })
+    .catch( (err) => {
+        logger.error(err)
+    })
+}
+
+async function updatePostMediaId(postId, threadId, mediaId) {
+    //
+    logger.debug('mediaId: ', mediaId)
+    // Update post record
+    return db.Post.update(
+        {
+            media_id: mediaId,
+            media_done: true,
+        },
+        {where: 
+            {
+                postNumber: postId,
+                thread_num: threadId,
+            },
+        }
+    )
 }
 
 async function downloadMedia(url, filepath) {
     // Save a target URL to a target path
     logger.trace('before limiter; url, filepath: ', url, filepath)
-    logger.warn('Media downloading disabled!')
-    return
+    // logger.warn('Media downloading disabled!')
+    // return
     limiter.removeTokens(1, function() {
         logger.debug('Saving URL: ', url, 'to filepath: ',filepath)
         // return
@@ -662,9 +747,13 @@ async function downloadMedia(url, filepath) {
     return
 }
 
-function insertPostFinal (postData, threadId, mediaId, trans) {
+function insertPostFinal (postData, threadId, mediaId, trans, mediaDone) {
     // Insert the post's data
     logger.debug('Inserting post data')
+    if (!(postData.tim)) {
+        // logger.warn('tim is not there! postData: ',postData)
+        postData.tim = null    
+    }
     return db.Post.create({
         postNumber: postData.no,
         thread_num: threadId,
@@ -673,6 +762,7 @@ function insertPostFinal (postData, threadId, mediaId, trans) {
         comment: postData.com,
         op: isPostOP(postData,threadId),
         timestamp: postData.time,
+        tim: postData.tim,
         media_id: mediaId,
         spoiler: isPostSpoiler(postData),
         preview_orig: null,//TODO
@@ -684,7 +774,9 @@ function insertPostFinal (postData, threadId, mediaId, trans) {
         media_size: postData.fsize,//TODO
         media_hash: postData.md5,//TODO
         media_orig: null,//TODO
+        ext: postData.ext,
         deleted: (postData.deleted),
+        media_done: mediaDone
         },
         {transaction: trans}
     )
