@@ -9,6 +9,7 @@ const rp = require('request-promise')
 const rp_errors = require('request-promise/errors');
 const request = require('request');// for file streaming
 const assert = require('assert');
+const md5File = require('md5-file')
 var RateLimiter = require('limiter').RateLimiter;
 var global_imageLimiter = new RateLimiter(1, 2000);// MUST be above 1000
 
@@ -42,7 +43,7 @@ db.Post.sync({ force: false }).then(db.Image.sync({ force: false })).then(db.Thr
 // .then(handleThread(global_siteURL, global_boardName, global_threadID))
 // .then(handleWholeThreadAtOnce( global_siteURL, global_boardName, global_threadID ) )
 // .then(handleMultipleThreadsSequentially(global_siteURL, global_boardName, global_threadIds))
-.then(handleAllMedia(siteURL=global_siteURL, boardName=global_boardName, loopLimit=30))
+.then(handleAllMedia(siteURL=global_siteURL, boardName=global_boardName, loopLimit=2))
 .catch( (err) => {
     logger.error(err)
 });
@@ -125,6 +126,12 @@ async function handlePostMedia(siteURL, boardName, postRow) {//WIP
             await downloadMedia(fullURL, fullFilePath)
             // Save thumb
             await downloadMedia(thumbURL, thumbFilePath)
+            
+            // TODO Validate files
+            // Compare size and MD5
+            // var hashesMatch = await checkFileMd5(filepath=fullFilePath, md5b64=md5)
+            // logger.debug('hashesMatch=', hashesMatch)
+
             // Insert row into Images table
             return db.Image.create(
                 {
@@ -174,22 +181,39 @@ async function updatePostMediaId(postId, threadId, mediaId) {
 }
 
 async function downloadMedia(url, filepath) {
-    // Save a target URL to a target path
-    logger.trace('before limiter; url, filepath: ', url, filepath)
-    // logger.warn('Media downloading disabled!')
-    // return
-    global_imageLimiter.removeTokens(1, function() {
-        logger.debug('Saving URL: ', url, 'to filepath: ',filepath)
+    dlPromise =  new Promise ( (resolve, reject) => {
+        // Save a target URL to a target path
+        logger.trace('before limiter; url, filepath: ', url, filepath)
+        // logger.warn('Media downloading disabled!')
         // return
-        request.get(url)
-        .on('error', function(err) {
-            logger.error('err', err)
-            console.log('downloadMedia() err ',err)
-            throw(err)
+        global_imageLimiter.removeTokens(1, function() {
+            logger.debug('Saving URL: ', url, 'to filepath: ',filepath)
+            // return
+            request.get(url)
+            .on('error', function(err) {
+                logger.error('err', err)
+                console.log('downloadMedia() err ',err)
+                throw(err)
+                reject(err)
+            })
+            .pipe(fs.createWriteStream(filepath))
+            .on('finish', () => {
+                logger.debug('Successfully saved URL: ', url, 'to filepath: ',filepath)
+                resolve(filepath)
+            })
         })
-        .pipe(fs.createWriteStream(filepath))
     })
-    return
+    return dlPromise
 }
 
-
+async function checkFileMd5 (filepath, md5b64) {// TODO
+    // Return true if md5 of file matches given md5 (given as base64)
+    logger.debug('checkFileMd5 filepath=', filepath, '; md5b64=: ',md5b64)
+    md5File(filepath, (err, hash) => {
+        if (err) throw(err)
+        console.log(`The MD5 sum of ${filepath} is: ${hash}`)
+        console.log(`md5b64= ${md5b64}; hash: ${hash}`)
+        if (md5b64 === hash) resolve()
+        reject()
+    })
+}
