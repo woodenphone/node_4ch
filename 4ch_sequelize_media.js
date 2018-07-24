@@ -9,7 +9,8 @@ const rp = require('request-promise')
 const rp_errors = require('request-promise/errors');
 const request = require('request');// for file streaming
 const assert = require('assert');
-const md5File = require('md5-file')
+const md5File = require('md5-file');
+const crypto = require('crypto');
 var RateLimiter = require('limiter').RateLimiter;
 var global_imageLimiter = new RateLimiter(1, 2000);// MUST be above 1000
 
@@ -129,8 +130,8 @@ async function handlePostMedia(siteURL, boardName, postRow) {//WIP
             
             // TODO Validate files
             // Compare size and MD5
-            // var hashesMatch = await checkFileMd5(filepath=fullFilePath, md5b64=md5)
-            // logger.debug('hashesMatch=', hashesMatch)
+            var hashesMatch = await checkFileMd5(filepath=fullFilePath, md5b64=md5)
+            logger.debug('hashesMatch=', hashesMatch)
 
             // Insert row into Images table
             return db.Image.create(
@@ -206,14 +207,32 @@ async function downloadMedia(url, filepath) {
     return dlPromise
 }
 
-async function checkFileMd5 (filepath, md5b64) {// TODO
+async function checkFileMd5 (filepath, md5B64) {// TODO
     // Return true if md5 of file matches given md5 (given as base64)
-    logger.debug('checkFileMd5 filepath=', filepath, '; md5b64=: ',md5b64)
-    md5File(filepath, (err, hash) => {
-        if (err) throw(err)
-        console.log(`The MD5 sum of ${filepath} is: ${hash}`)
-        console.log(`md5b64= ${md5b64}; hash: ${hash}`)
-        if (md5b64 === hash) resolve()
-        reject()
+    hashCheckPromise =  new Promise ( (resolve, reject) => {
+        logger.debug('checkFileMd5 filepath=', filepath, '; md5B64=: ',md5B64)
+        var decodedMd5B64 = Buffer.from(md5B64, 'base64').toString('hex')
+        var hash_a = crypto.createHash('md5')
+        var md5_a
+        stream = fs.createReadStream(filepath);
+        stream.on('data',async  function (data) {
+            hash_a.update(data)//, 'utf8')
+        })
+        stream.on('end', function () {
+            md5_a = hash_a.digest('hex'); // 34f7a3113803f8ed3b8fd7ce5656ebec
+            logger.debug(`decodedMd5B64= ${decodedMd5B64}; md5_a: ${md5_a}`)
+            hashes_match = (decodedMd5B64 === md5_a)
+            logger.debug(`hashes_match= ${hashes_match}`)
+            resolve(hashes_match)
+        })
     })
+    return hashCheckPromise
+    // await md5File(filepath, async (err, hash_b) => {
+    //     if (err) throw(err)
+    //     logger.debug(`The MD5 sum of ${filepath} is: ${hash_b}`)
+    //     logger.debug(`decodedMd5B64= ${decodedMd5B64}; hash_b: ${hash_b}`)
+    // logger.debug(`.`)
+    //     // resolve( (decodedMd5B64 === hash_b) )
+    //     // reject()
+    // })
 }
