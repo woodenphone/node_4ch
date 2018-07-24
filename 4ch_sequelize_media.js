@@ -42,7 +42,7 @@ db.Post.sync({ force: false }).then(db.Image.sync({ force: false })).then(db.Thr
 // .then(handleThread(global_siteURL, global_boardName, global_threadID))
 // .then(handleWholeThreadAtOnce( global_siteURL, global_boardName, global_threadID ) )
 // .then(handleMultipleThreadsSequentially(global_siteURL, global_boardName, global_threadIds))
-.then(handleAllMedia(siteURL=global_siteURL, boardName=global_boardName, loopLimit=5))
+.then(handleAllMedia(siteURL=global_siteURL, boardName=global_boardName, loopLimit=30))
 .catch( (err) => {
     logger.error(err)
 });
@@ -52,13 +52,11 @@ db.Post.sync({ force: false }).then(db.Image.sync({ force: false })).then(db.Thr
 async function handleAllMedia(siteURL, boardName, loopLimit) {
     // Iterate over an array of threadIDs but also process some media
     // logger.debug('processing threads: ',threadIds)
-    var loopLimiter = new RateLimiter(1, 10000);//
     for (var i = 0; i< loopLimit; i++){
-        loopLimiter.removeTokens(1, async function () {
-            await handleSomeMedia(siteURL, boardName)
-        })
+        logger.debug('handleAllMedia() i=', i)
+        await handleSomeMedia(siteURL, boardName)
     }
-    logger.debug('Finished processing threads.')
+    logger.debug('handleAllMedia() Finished processing threads.')
     return
 }
 
@@ -74,13 +72,13 @@ async function handleSomeMedia(siteURL, boardName,) {//WIP
             limit: 10
         },
     )
-    .then( (mediaTodoPostRows) => {
+    .then( async function (mediaTodoPostRows) {
         // logger.debug('mediaTodoPostRows:', mediaTodoPostRows)
         logger.debug('mediaTodoPostRows.length: ', mediaTodoPostRows.length)
         // For each unprocessed post, handle the media
         for (var i = 0; i< mediaTodoPostRows.length; i++){
             mediaTodoPostRow = mediaTodoPostRows[i]
-            handlePostMedia(siteURL, boardName, mediaTodoPostRow)
+            await handlePostMedia(siteURL, boardName, mediaTodoPostRow)
         }
         return
     })
@@ -107,13 +105,13 @@ async function handlePostMedia(siteURL, boardName, postRow) {//WIP
             where:{media_hash: md5}
         },
     )
-    .then( (md5SearchRow) => {
+    .then( async function (md5SearchRow) {
         // logger.debug('md5SearchRow:', md5SearchRow)
         if (md5SearchRow) {
             logger.debug('Image is already in the DB')
             // If MD5 found, use that as our entry in media table
             var mediaId = md5SearchRow.id
-            updatePostMediaId(postId, threadId, mediaId)
+            return updatePostMediaId(postId, threadId, mediaId)
         } else {
             // Fetch the media files for the post
             // Decide where to save each file
@@ -124,9 +122,9 @@ async function handlePostMedia(siteURL, boardName, postRow) {//WIP
             var thumbURL = `https://i.4cdn.org/${boardName}/${postRow.tim}s.jpg`
             var thumbFilePath = `debug/${boardName}/thumb/${postRow.tim}s.jpg`
             // Save full image
-            downloadMedia(fullURL, fullFilePath)
+            await downloadMedia(fullURL, fullFilePath)
             // Save thumb
-            downloadMedia(thumbURL, thumbFilePath)
+            await downloadMedia(thumbURL, thumbFilePath)
             // Insert row into Images table
             return db.Image.create(
                 {
@@ -137,11 +135,11 @@ async function handlePostMedia(siteURL, boardName, postRow) {//WIP
                 },
                 // {transaction: trans}
             )
-            .then( (imageRow) => {
+            .then( async function (imageRow) {
                 logger.trace('Image added to DB: imageRow=', imageRow)
                 var mediaId = imageRow.id
                 logger.debug('Image added to DB: mediaId=', mediaId)
-                updatePostMediaId(postId, threadId, mediaId)
+                return updatePostMediaId(postId, threadId, mediaId)
            })
         }
     })
@@ -169,9 +167,10 @@ async function updatePostMediaId(postId, threadId, mediaId) {
             },
         }
     )
-    .then(
+    .then( () => {
         logger.debug('updatePostMediaId() ran insert')
-    )
+        return
+    })
 }
 
 async function downloadMedia(url, filepath) {
