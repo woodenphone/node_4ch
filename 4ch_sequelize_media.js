@@ -129,9 +129,12 @@ async function handlePostMedia(siteURL, boardName, postRow) {//WIP
             await downloadMedia(thumbURL, thumbFilePath)
             
             // TODO Validate files
+            // Ensure files exist
             // Compare size and MD5
             var hashesMatch = await checkFileMd5(filepath=fullFilePath, md5b64=md5)
             logger.debug('hashesMatch=', hashesMatch)
+            var sizesMatch = await checkFileSize(filepath=fullFilePath, expectedFileSize=postRow.media_size)
+            logger.debug('sizesMatch=', sizesMatch)
 
             // Insert row into Images table
             return db.Image.create(
@@ -216,10 +219,10 @@ async function checkFileMd5 (filepath, md5B64) {// TODO
         var md5_a
         stream = fs.createReadStream(filepath);
         stream.on('data',async  function (data) {
-            hash_a.update(data)//, 'utf8')
+            hash_a.update(data)
         })
         stream.on('end', function () {
-            md5_a = hash_a.digest('hex'); // 34f7a3113803f8ed3b8fd7ce5656ebec
+            md5_a = hash_a.digest('hex');
             logger.debug(`decodedMd5B64= ${decodedMd5B64}; md5_a: ${md5_a}`)
             hashes_match = (decodedMd5B64 === md5_a)
             logger.debug(`hashes_match= ${hashes_match}`)
@@ -227,12 +230,27 @@ async function checkFileMd5 (filepath, md5B64) {// TODO
         })
     })
     return hashCheckPromise
-    // await md5File(filepath, async (err, hash_b) => {
-    //     if (err) throw(err)
-    //     logger.debug(`The MD5 sum of ${filepath} is: ${hash_b}`)
-    //     logger.debug(`decodedMd5B64= ${decodedMd5B64}; hash_b: ${hash_b}`)
-    // logger.debug(`.`)
-    //     // resolve( (decodedMd5B64 === hash_b) )
-    //     // reject()
-    // })
+}
+
+async function checkFileSize(filePath, expectedFileSize) {
+    // Ensure a file exists, then check if the fil size matches the expected value
+    fileSizePromise = new Promise ( (resolve, reject) => {
+        fs.exists(filePath, function(exists) {
+            if (!(exists) ) {
+                reject('File does not exist!', filePath)
+            } else {
+                fs.stat(filePath, (err, stats) => {
+                    if (err) reject(err)
+                    actualFileSize = stats.size
+                    logger.debug('expectedFileSize=', expectedFileSize, '; actualFileSize=', actualFileSize)
+                    if (expectedFileSize === actualFileSize) {
+                        resolve(true)
+                    } else {
+                        reject('Filesize does not match!')
+                    }
+                })
+            }
+        })
+    })
+    return fileSizePromise
 }
