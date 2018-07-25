@@ -11,6 +11,7 @@ const request = require('request');// for file streaming
 const assert = require('assert');
 const md5File = require('md5-file');
 const crypto = require('crypto');
+const async = require('async')
 var RateLimiter = require('limiter').RateLimiter;
 var global_imageLimiter = new RateLimiter(1, 1000);// MUST be above 1000
 
@@ -76,13 +77,17 @@ async function handleSomeMedia(siteURL, boardName,) {//WIP
         },
     )
     .then( async function (mediaTodoPostRows) {
-        // logger.debug('mediaTodoPostRows:', mediaTodoPostRows)
+        //logger.debug('mediaTodoPostRows:', mediaTodoPostRows)
         logger.debug('mediaTodoPostRows.length: ', mediaTodoPostRows.length)
         // For each unprocessed post, handle the media
-        for (var i = 0; i< mediaTodoPostRows.length; i++){
-            mediaTodoPostRow = mediaTodoPostRows[i]
-            await handlePostMedia(siteURL, boardName, mediaTodoPostRow)
-        }
+        async.map(mediaTodoPostRows, handlePostMedia, function(err, results) {
+            logger.info('err=', err ,';results=', results)
+            return
+        })
+        // for (var i = 0; i< mediaTodoPostRows.length; i++){
+        //     mediaTodoPostRow = mediaTodoPostRows[i]
+        //     await handlePostMedia(mediaTodoPostRow)
+        // }
         return
     })
     .then( () => {
@@ -95,10 +100,10 @@ async function handleSomeMedia(siteURL, boardName,) {//WIP
     })
 }
 
-async function handlePostMedia(siteURL, boardName, postRow) {//WIP
+async function handlePostMedia(postRow) {//WIP
     // See if post even needs media processing by checking if it has post.md5 set
     logger.debug('handlePostMedia()')
-    // logger.debug('postRow:', postRow)
+    logger.debug('postRow:', postRow)
     var postId = postRow.postNumber
     var threadId = postRow.thread_num
     // Lookup md5 to see if we can skip downloading
