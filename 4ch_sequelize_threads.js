@@ -45,6 +45,7 @@ db.Post.sync({ force: false }).then(db.Image.sync({ force: false })).then(db.Thr
 .then(handleThreads(global_siteURL, global_boardName))
 .catch( (err) => {
     logger.error(err)
+    throw(err)
 });
 
 
@@ -210,6 +211,7 @@ async function handleWholeThreadAtOnce(siteURL, boardName, threadId) {
                     })
                     .catch( (err) => {
                         logger.error(err)
+                        throw(err)
                     })
                 }
             }).then( () => {
@@ -311,6 +313,7 @@ function updatePost(postApiData, postRow, postID, threadId, trans) {// TODO
     })
     .catch( (err) => {
         logger.error(err)
+        throw(err)
     })
 }
 
@@ -449,7 +452,7 @@ function insertPostFinal (postData, threadId, mediaId, trans, mediaDone) {
         preview_orig: null,//TODO
         preview_w: postData.tn_w,//TODO
         preview_h: postData.tn_h,//TODO
-        media_filename: getPostFilename,//TODO
+        media_filename: getPostFilename(postData),//TODO
         media_w: postData.w,//TODO
         media_h: postData.h,//TODO
         media_size: postData.fsize,//TODO
@@ -466,6 +469,7 @@ function insertPostFinal (postData, threadId, mediaId, trans, mediaDone) {
     })
     // .catch( (err) => {
     //     logger.error(err)
+            // throw(err)
     // })
 }
 

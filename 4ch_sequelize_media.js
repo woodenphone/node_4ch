@@ -12,7 +12,7 @@ const assert = require('assert');
 const md5File = require('md5-file');
 const crypto = require('crypto');
 var RateLimiter = require('limiter').RateLimiter;
-var global_imageLimiter = new RateLimiter(1, 2000);// MUST be above 1000
+var global_imageLimiter = new RateLimiter(1, 1000);// MUST be above 1000
 
 // Setup logging
 const tracer = require('tracer')
@@ -91,6 +91,7 @@ async function handleSomeMedia(siteURL, boardName,) {//WIP
     })
     .catch( (err) => {
         logger.error(err)
+        throw(err)
     })
 }
 
@@ -108,61 +109,81 @@ async function handlePostMedia(siteURL, boardName, postRow) {//WIP
             where:{media_hash: md5}
         },
     )
-    .then( async function (md5SearchRow) {
-        // logger.debug('md5SearchRow:', md5SearchRow)
-        if (md5SearchRow) {
-            logger.debug('Image is already in the DB')
+    .then( function decideIfDoDownload (md5ImageSearchRow) {
+        if (md5ImageSearchRow) {
+            var mediaId = md5ImageSearchRow.media_hash
+            logger.debug('Image md5 is already in the DB, skip downloading it.')
             // If MD5 found, use that as our entry in media table
-            var mediaId = md5SearchRow.id
             return updatePostMediaId(postId, threadId, mediaId)
         } else {
-            // Fetch the media files for the post
-            // Decide where to save each file
-            // Images: http(s)://i.4cdn.org/board/tim.ext
-            var fullURL = `https://i.4cdn.org/${boardName}/${postRow.tim}${postRow.ext}`
-            var fullFilePath = `${global_downloadPath}${boardName}/${postRow.tim}${postRow.ext}`
-            // Thumbnails: http(s)://i.4cdn.org/board/tims.jpg
-            var thumbURL = `https://i.4cdn.org/${boardName}/${postRow.tim}s.jpg`
-            var thumbFilePath = `${global_downloadPath}${boardName}/thumb/${postRow.tim}s.jpg`
-            // Save full image
-            //await resilientDownloadMedia(url=fullURL, filepath=fullFilePath, expectedMd5=md5, expectedFileSize=postRow.media_size)
-            await downloadMedia(fullURL, fullFilePath)
-            // Save thumb
-            await downloadMedia(thumbURL, thumbFilePath)
-            
-            // // TODO Validate files
-            // // Ensure files exist
-            // // Compare size and MD5
-            // var hashesMatch = await checkFileMd5(filepath=fullFilePath, md5b64=md5)
-            // logger.debug('hashesMatch=', hashesMatch)
-            // var sizesMatch = await checkFileSize(filepath=fullFilePath, expectedFileSize=postRow.media_size)
-            // logger.debug('sizesMatch=', sizesMatch)
-
-            // Insert row into Images table
-            return db.Image.create(
-                {
-                    media_hash: md5,
-                    media: fullFilePath,// TODO Verify format Asagi uses
-                    preview_op: null,//'local/path/to/preview_op.ext',// TODO
-                    preview_reply: thumbFilePath,// TODO Verify format Asagi uses
-                },
-                // {transaction: trans}
-            )
-            .then( async function (imageRow) {
-                logger.trace('Image added to DB: imageRow=', imageRow)
-                var mediaId = imageRow.id
-                logger.debug('Image added to DB: mediaId=', mediaId)
-                return updatePostMediaId(postId, threadId, mediaId)
-           })
+            logger.debug('Image md5 is not in the DB, so download it.')
+            return downloadPostMedia(postRow, postId, threadId, md5) 
         }
-    })
-    .then( () => {
-        logger.debug('Proccessed media for postId=', postId)
     })
     .catch( (err) => {
         logger.error(err)
+        throw(err)
     })
 }
+
+function downloadPostMedia (postRow, postId, threadId, md5) {
+    // Assumes it is known that this media needs downloading.  
+    // Decide where to save each file
+    // Images: http(s)://i.4cdn.org/board/tim.ext
+    var fullURL = `https://i.4cdn.org/${boardName}/${postRow.tim}${postRow.ext}`
+    var fullFilePath = `${global_downloadPath}${boardName}/${postRow.tim}${postRow.ext}`
+    // Thumbnails: http(s)://i.4cdn.org/board/tims.jpg
+    var thumbURL = `https://i.4cdn.org/${boardName}/${postRow.tim}s.jpg`
+    var thumbFilePath = `${global_downloadPath}${boardName}/thumb/${postRow.tim}s.jpg`
+    fakePromise = new Promise( (resolve, reject) => { resolve() })// Only here to start the promise chain
+    fakePromise
+    .then( async function loadMediaUrls () {
+        // Fetch the media files for the post
+        // Save full image
+        //await resilientDownloadMedia(url=fullURL, filepath=fullFilePath, expectedMd5=md5, expectedFileSize=postRow.media_size)
+        await downloadMedia(fullURL, fullFilePath)
+        // Save thumb
+        await downloadMedia(thumbURL, thumbFilePath)
+        return
+    })
+    .then(async function validateFiles () {
+        // // TODO Validate files
+        // // Ensure files exist
+        // // Compare size and MD5
+        // var hashesMatch = await checkFileMd5(filepath=fullFilePath, md5b64=md5)
+        // logger.debug('hashesMatch=', hashesMatch)
+        // var sizesMatch = await checkFileSize(filepath=fullFilePath, expectedFileSize=postRow.media_size)
+        // logger.debug('sizesMatch=', sizesMatch)
+        return
+    })
+    .then( async function insertImageRow () {
+        // Insert row into Images table
+        return db.Image.create(
+            {
+                media_hash: md5,
+                media: fullFilePath,// TODO Verify format Asagi uses
+                preview_op: null,//'local/path/to/preview_op.ext',// TODO
+                preview_reply: thumbFilePath,// TODO Verify format Asagi uses
+            },
+            // {transaction: trans}
+        )
+    })
+    .then( async function afterImageRowInsert (imageRow) {
+        logger.trace('Image added to DB: imageRow=', imageRow)
+        var mediaId = imageRow.id
+        logger.debug('Image added to DB: mediaId=', mediaId)
+        return updatePostMediaId(postId, threadId, mediaId)
+    })
+    .then( async function afterPostMediaIdUpdate (postUpdateResult) {
+    logger.debug('postUpdateResult=', postUpdateResult)
+    logger.debug('Proccessed media for postId=', postId)
+    })
+    .catch( (err) => {
+        logger.error(err)
+        throw(err)
+    })
+}
+
 
 async function updatePostMediaId(postId, threadId, mediaId) {
     //
@@ -183,6 +204,10 @@ async function updatePostMediaId(postId, threadId, mediaId) {
     .then( () => {
         logger.debug('updatePostMediaId() ran insert')
         return
+    })
+    .catch( (err) => {
+        logger.error(err)
+        throw(err)
     })
 }
 
