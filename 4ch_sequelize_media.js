@@ -33,7 +33,7 @@ const db = require('./4ch_sequelize_database.js')// DB schema and setup
 
 const global_siteURL = 'https://a.4cdn.org'
 const global_boardName = 'g'
-const global_downloadPath = './debug/'
+const global_downloadPath = './debug/'// Must be format 'pathHere/'
 
 // Create tables
 // force: true will drop the table if it already exists
@@ -45,6 +45,7 @@ db.Post.sync({ force: false }).then(db.Image.sync({ force: false })).then(db.Thr
 // .then(handleWholeThreadAtOnce( global_siteURL, global_boardName, global_threadID ) )
 // .then(handleMultipleThreadsSequentially(global_siteURL, global_boardName, global_threadIds))
 .then(handleAllMedia(siteURL=global_siteURL, boardName=global_boardName, loopLimit=2))
+.then(logger.debug('End of program.'))// Inform us that execution has finished
 .catch( (err) => {
     logger.error(err)
 });
@@ -119,22 +120,23 @@ async function handlePostMedia(siteURL, boardName, postRow) {//WIP
             // Decide where to save each file
             // Images: http(s)://i.4cdn.org/board/tim.ext
             var fullURL = `https://i.4cdn.org/${boardName}/${postRow.tim}${postRow.ext}`
-            var fullFilePath = `debug/${boardName}/${postRow.tim}${postRow.ext}`
+            var fullFilePath = `${global_downloadPath}${boardName}/${postRow.tim}${postRow.ext}`
             // Thumbnails: http(s)://i.4cdn.org/board/tims.jpg
             var thumbURL = `https://i.4cdn.org/${boardName}/${postRow.tim}s.jpg`
-            var thumbFilePath = `debug/${boardName}/thumb/${postRow.tim}s.jpg`
+            var thumbFilePath = `${global_downloadPath}${boardName}/thumb/${postRow.tim}s.jpg`
             // Save full image
+            //await resilientDownloadMedia(url=fullURL, filepath=fullFilePath, expectedMd5=md5, expectedFileSize=postRow.media_size)
             await downloadMedia(fullURL, fullFilePath)
             // Save thumb
             await downloadMedia(thumbURL, thumbFilePath)
             
-            // TODO Validate files
-            // Ensure files exist
-            // Compare size and MD5
-            var hashesMatch = await checkFileMd5(filepath=fullFilePath, md5b64=md5)
-            logger.debug('hashesMatch=', hashesMatch)
-            var sizesMatch = await checkFileSize(filepath=fullFilePath, expectedFileSize=postRow.media_size)
-            logger.debug('sizesMatch=', sizesMatch)
+            // // TODO Validate files
+            // // Ensure files exist
+            // // Compare size and MD5
+            // var hashesMatch = await checkFileMd5(filepath=fullFilePath, md5b64=md5)
+            // logger.debug('hashesMatch=', hashesMatch)
+            // var sizesMatch = await checkFileSize(filepath=fullFilePath, expectedFileSize=postRow.media_size)
+            // logger.debug('sizesMatch=', sizesMatch)
 
             // Insert row into Images table
             return db.Image.create(
@@ -155,7 +157,7 @@ async function handlePostMedia(siteURL, boardName, postRow) {//WIP
         }
     })
     .then( () => {
-        logger.debug('proccessed postId=', postId)
+        logger.debug('Proccessed media for postId=', postId)
     })
     .catch( (err) => {
         logger.error(err)
@@ -184,14 +186,38 @@ async function updatePostMediaId(postId, threadId, mediaId) {
     })
 }
 
-async function downloadMedia(url, filepath) {
+async function resilientDownloadMedia(url, filePath, expectedMd5, expectedFileSize, attemptCount=0) {// WIP
+    const maxAttempts = 5
+    rdlPromise =  new Promise ( (resolve, reject) => {
+        logger.debug('resilientDownloadMedia() url=', url, ', filePath =', filePath,', expectedMd5=', expectedMd5, ', expectedFileSize=', expectedFileSize, ', attemptCount=', attemptCount)
+        if (attemptCount > maxAttempts) reject('Too many failed download attempts.')
+        return downloadMedia(url, filePath)
+        .then( () => {
+            checkFileSize(filePath, expectedFileSize)
+        })
+        .then( () => {
+            checkFileMd5(filePath, md5B64=expectedMd5)
+        })
+        .then( () => {
+            resolve()
+        })
+        .catch( (err) => {
+            logger.error(err)
+            attemptCount += 1
+            return resilientDownloadMedia(url, filePath, expectedMd5, expectedFileSize, attemptCount)
+        })
+    })
+    return rdlPromise
+}
+
+async function downloadMedia(url, filePath) {
     dlPromise =  new Promise ( (resolve, reject) => {
         // Save a target URL to a target path
-        logger.trace('before limiter; url, filepath: ', url, filepath)
+        logger.trace('before limiter; url, filePath: ', url, filePath)
         // logger.warn('Media downloading disabled!')
         // return
         global_imageLimiter.removeTokens(1, function() {
-            logger.debug('Saving URL: ', url, 'to filepath: ',filepath)
+            logger.debug('Saving URL: ', url, 'to filePath: ',filePath)
             // return
             request.get(url)
             .on('error', function(err) {
@@ -200,24 +226,24 @@ async function downloadMedia(url, filepath) {
                 throw(err)
                 reject(err)
             })
-            .pipe(fs.createWriteStream(filepath))
+            .pipe(fs.createWriteStream(filePath))
             .on('finish', () => {
-                logger.debug('Successfully saved URL: ', url, 'to filepath: ',filepath)
-                resolve(filepath)
+                logger.debug('Successfully saved URL: ', url, 'to filePath: ',filePath)
+                resolve(filePath)
             })
         })
     })
     return dlPromise
 }
 
-async function checkFileMd5 (filepath, md5B64) {// TODO
+async function checkFileMd5 (filePath, md5B64) {// WIP
     // Return true if md5 of file matches given md5 (given as base64)
     hashCheckPromise =  new Promise ( (resolve, reject) => {
-        logger.debug('checkFileMd5 filepath=', filepath, '; md5B64=: ',md5B64)
+        logger.debug('checkFileMd5 filePath=', filePath, '; md5B64=: ',md5B64)
         var decodedMd5B64 = Buffer.from(md5B64, 'base64').toString('hex')
         var hash_a = crypto.createHash('md5')
         var md5_a
-        stream = fs.createReadStream(filepath);
+        stream = fs.createReadStream(filePath);
         stream.on('data',async  function (data) {
             hash_a.update(data)
         })
@@ -226,13 +252,17 @@ async function checkFileMd5 (filepath, md5B64) {// TODO
             logger.debug(`decodedMd5B64= ${decodedMd5B64}; md5_a: ${md5_a}`)
             hashes_match = (decodedMd5B64 === md5_a)
             logger.debug(`hashes_match= ${hashes_match}`)
-            resolve(hashes_match)
+            if (hashes_match) {
+                resolve()
+            } else {
+                reject('Hashes do not match.')
+            }
         })
     })
     return hashCheckPromise
 }
 
-async function checkFileSize(filePath, expectedFileSize) {
+async function checkFileSize(filePath, expectedFileSize) {// WIP
     // Ensure a file exists, then check if the fil size matches the expected value
     fileSizePromise = new Promise ( (resolve, reject) => {
         fs.exists(filePath, function(exists) {
