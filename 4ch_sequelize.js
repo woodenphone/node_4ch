@@ -187,6 +187,14 @@ function isPostLocked(postData) {
 function isPostSpoiler(postData) {
     return (postData.spoiler == 1)
 }
+
+function getPostFilename(postData) {
+    if (postData.filename) {
+        return postData.filename
+    } else {
+        return null
+    }
+}
 // /Functions that check if a post is something
 
 // Functions that check something about a thread
@@ -768,7 +776,7 @@ function insertPostFinal (postData, threadId, mediaId, trans, mediaDone) {
         preview_orig: null,//TODO
         preview_w: postData.tn_w,//TODO
         preview_h: postData.tn_h,//TODO
-        media_filename: null,//TODO
+        media_filename: getPostFilename,//TODO
         media_w: postData.w,//TODO
         media_h: postData.h,//TODO
         media_size: postData.fsize,//TODO

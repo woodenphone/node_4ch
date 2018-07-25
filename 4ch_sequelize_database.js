@@ -58,7 +58,7 @@ const Image = sequelize.define('image', {
     //     autoIncrement: true,
     //     unique: 'media_id_Unique_Index'
     // },
-    media_hash: {
+    media_hash: {//as 4ch post.md5 (md5 b64)
         type: Sequelize.TEXT,
         allowNull: false,
         unique: 'MediaHashUniqueIndex',
@@ -138,7 +138,7 @@ const Thread = sequelize.define('thread', {
 
 // Define post columns
 const Post = sequelize.define('post', {
-    postNumber: {
+    postNumber: {// 4ch post.no
         type: Sequelize.INTEGER,
         allowNull: false,
         unique: 'PostNumberAndThreadNumberUniqueIndex'// This is to ensure that only one entry has a conbination of threadID.PostID
@@ -150,16 +150,16 @@ const Post = sequelize.define('post', {
         model: Thread,// Foreign key threads.threadNumber
         key: 'threadNumber',// Foreign key threads.threadNumber
     },
-    name: {
+    name: {// 4ch post.name
         type: Sequelize.TEXT,
     },
     trip: {
         type: Sequelize.TEXT,
     },
-    title: {
+    title: {// 4ch post.sub
         type: Sequelize.TEXT,
     },
-    comment: {
+    comment: {// 4ch post.com
         type: Sequelize.TEXT,
     },
     op: {
@@ -167,17 +167,17 @@ const Post = sequelize.define('post', {
         allowNull: false,
         defaultValue: false
     },
-    timestamp: {
+    timestamp: {// 4ch post.time
         type: Sequelize.INTEGER,
         allowNull: false
     },
     timestamp_expired: {
         type: Sequelize.INTEGER,
     },
-    tim: {
+    tim: {// 4ch post.tim
         type: Sequelize.INTEGER,
     },
-    media_id: {
+    media_id: {// images.id foreign key
         type: Sequelize.INTEGER,
         allowNull: true,
         model: Image,// Foreign key
@@ -191,38 +191,38 @@ const Post = sequelize.define('post', {
     preview_orig: {
         type: Sequelize.TEXT,
     },
-    preview_w: {
+    preview_w: {// 4ch post.tn_w
         type: Sequelize.INTEGER,
         allowNull: false,
         defaultValue: 0
     },
-    preview_h: {
+    preview_h: {// 4ch post.tn_h
         type: Sequelize.INTEGER,
         allowNull: false,
         defaultValue: 0
     },
-    media_filename: {
+    media_filename: {// if exists 4ch post.filename, otherwise null
         type: Sequelize.TEXT,
     },
-    ext: {
+    ext: {// 4ch post.ext
         type: Sequelize.TEXT,
     },
-    media_w: {
+    media_w: {// 4ch post.w
         type: Sequelize.INTEGER,
         allowNull: false,
         defaultValue: 0
     },
-    media_h: {
+    media_h: {// 4ch post.h
         type: Sequelize.INTEGER,
         allowNull: false,
         defaultValue: 0
     },
-    media_size: {
+    media_size: {// 4ch post.fsize
         type: Sequelize.INTEGER,
         allowNull: false,
         defaultValue: 0
     },
-    media_hash: {
+    media_hash: {// 4ch post.md5
         type: Sequelize.TEXT,
     },
     media_orig: {
