@@ -314,7 +314,7 @@ async function handleWholeThreadAtOnce(siteURL, boardName, threadId) {
                         return dp = Promise.all(newApiPosts.map( (postRow) => {
                             return insertPost(postRow, threadId, trans, boardName);
                         })).then( (arrayOfResults) => {
-                            return logger.trace('dp() arrayOfResults', arrayOfResults)
+                            return logger.trace('dp() arrayOfResults ', arrayOfResults)
                         })    
                     })
                 })
