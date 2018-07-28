@@ -170,34 +170,74 @@ async function handleMultipleThreadsSequentiallyWithMediaAlso(siteURL, boardName
     }
     logger.debug('Finished processing threads.')
     return
-}
+};
 
 // Functions that check if a post is something
 function isPostSticky(postData) {
     //Non-sticky posts will lack 'sticky' key or have it set to false
     // Sticky posts will have post.sticky === 1
-    return (postData.sticky == 1)
-}
+    if (postData.sticky) {
+        return true
+    } else {
+        return false
+    }
+};
 
-function isPostOP(postData,threadId){
+function isPostOP(postData,threadId) {
     return (postData.no == threadId)
-}
+};
 
 function isPostLocked(postData) {
     return (postData.closed == 1)
-}
+};
 
 function isPostSpoiler(postData) {
     return (postData.spoiler == 1)
-}
+};
 
 function getPostFilename(postData) {
     if (postData.filename) {
-        return postData.filename
+        return `${postData.filename}${postData.ext}`
     } else {
         return null
     }
-}
+};
+
+function getPostCapcode(postData) {
+    // Return the capcode for a post if it has one, otherwise return 'N'
+    if (postData.capcode) {
+        return postData.capcode
+    } else {
+        return 'N'
+    }
+};
+
+function getPostTripcode(postData) {
+    // Return the tripcode for a post if it has one.
+    if (postData.trip) {
+        return postData.trip
+    } else {
+        return null
+    }
+};
+
+function getPostMediaorig(postData) {
+    // Return the value for the foolfuuka column 'media_orig'
+    if (postData.tim) {
+        return `${postData.tim}${postData.ext}`
+    } else {
+        return null
+    }
+};
+
+function getPostPrevieworig(postData) {
+    // Return the value for the foolfuuka column 'preview_orig'
+    if (postData.tim) {
+        return `${postData.tim}.jpg`
+    } else {
+        return null
+    }
+};
 // /Functions that check if a post is something
 
 // Functions that check something about a thread
@@ -673,14 +713,14 @@ async function downloadApiPostMedia(postData) {//WIP
         logger.error(err)
         throw(err)
     })
-}
+};
 
 
 async function downloadMedia(url, filepath) {
     // Save a target URL to a target path
     logger.trace('before limiter; url, filepath: ', url, filepath)
-    // logger.warn('Media downloading disabled!')
-    // return
+    logger.warn('Media downloading disabled!')
+    return
     limiter.removeTokens(1, function() {
         logger.debug('Saving URL: ', url, 'to filepath: ',filepath)
         // return
@@ -693,15 +733,13 @@ async function downloadMedia(url, filepath) {
         .pipe(fs.createWriteStream(filepath))
     })
     return
-}
+};
+
+
 
 function insertPostFinal (postData, threadId, mediaId) {
     // Insert the post's data
     logger.debug('Inserting post data postData.no=',postData.no)
-    if (!(postData.tim)) {// TODO: Move to seperate function
-        // logger.warn('tim is not there! postData: ',postData)
-        postData.tim = null    
-    }
     return db.Post.create({
         media_id: mediaId,
         poster_ip: 0,// 0 for scraped posts
@@ -711,7 +749,7 @@ function insertPostFinal (postData, threadId, mediaId) {
         op: isPostOP(postData,threadId),
         timestamp: postData.time,//TODO: Improve validation
         timestamp_expired: 0,// 0 for scraped posts
-        preview_orig: null,//TODO: collect this value
+        preview_orig: getPostPrevieworig(postData),//TODO: collect this value
         preview_w: postData.tn_w,//TODO: Improve validation
         preview_h: postData.tn_h,//TODO: Improve validation
         media_filename: getPostFilename(postData),//TODO: Improve validation
@@ -719,18 +757,18 @@ function insertPostFinal (postData, threadId, mediaId) {
         media_h: postData.h,//TODO: Improve validation
         media_size: postData.fsize,//TODO: Improve validation
         media_hash: postData.md5,//TODO: Improve validation
-        media_orig: null,//TODO: collect this value
+        media_orig: getPostMediaorig(postData),//TODO: collect this value
         spoiler: isPostSpoiler(postData),
         deleted: (postData.deleted),
-        capcode: 'N',//TODO: collect this value, 'N' as placeholder
+        capcode: getPostCapcode(postData),//TODO: collect this value, 'N' as placeholder
         email: null,//TODO: collect this value
         name: postData.name,//TODO: Improve validation
-        trip: null,// TODO: collect this value
+        trip: getPostTripcode(postData),// TODO: collect this value
         title: postData.sub,//TODO: Improve validation
         comment: postData.com,//TODO: Improve validation
         delpass: null,// null for scraped posts
-        sticky: 0,// TODO: collect this value, zero as placeholder
-        locked: 0,// TODO: collect this value, zero as placeholder
+        sticky: isPostSticky(postData),// TODO: collect this value, zero as placeholder
+        locked: isPostLocked(postData),// TODO: collect this value, zero as placeholder
         // poster_hash: null,// TODO: Find out if Asagi even collects this
         // poster_country: null,// TODO: Find out if Asagi even collects this
         exif: null,// TODO: Find out if Asagi even collects this
@@ -742,6 +780,4 @@ function insertPostFinal (postData, threadId, mediaId) {
     // .catch( (err) => {
     //     logger.error(err)
     // })
-}
-
-
+};
