@@ -1,14 +1,46 @@
 // sequelize_asagi_tables.js
 // sequelize definitions for the tables and columns Asagi uses.
+// For information on datatypes sequelize uses, see: http://docs.sequelizejs.com/variable/index.html#static-variable-DataTypes
+// Definitions are based on Asagi ones: https://github.com/desuarchive/asagi/blob/master/src/main/resources/net/easymodo/asagi/sql/Mysql/boards.sql
 const Sequelize = require('sequelize');
 
 
-const global_boardName = 'g'
+// Connect to the DB
+const sequelize = new Sequelize('database', 'username', 'password', {
+    host: 'localhost',
+    dialect: 'sqlite',
 
-// https://github.com/desuarchive/asagi/blob/master/src/main/resources/net/easymodo/asagi/sql/Mysql/boards.sql
-const Board = sequelize.define(`${global_boardName}`, {//CREATE TABLE IF NOT EXISTS "%%BOARD%%" (
+    pool: {
+        max: 5,
+        min: 0,
+        acquire: 30000,
+        idle: 10000
+    },
+
+    // SQLite only
+    storage: 'junk_asagi_sequelize.sqlite',
+
+    // http://docs.sequelizejs.com/manual/tutorial/querying.html#operators
+    operatorsAliases: false
+});
+
+sequelize
+.authenticate()
+.then(() => {
+    console.log('Connection has been established successfully.');
+})
+.catch(err => {
+    console.error('Unable to connect to the database:', err);
+});
+
+
+const global_boardName = 'g'// Temporary placeholder
+
+
+const post = sequelize.define(`${global_boardName}`, {//CREATE TABLE IF NOT EXISTS "%%BOARD%%" (
     doc_id: {// "doc_id" int unsigned NOT NULL auto_increment,
-        type: Sequelize.INTEGER,// primary key
+        type: Sequelize.INTEGER,
+        primaryKey: true,// primary key
         allowNull: false,
         unique: 'BoardNameUniqueIndex',
     },
@@ -25,10 +57,12 @@ const Board = sequelize.define(`${global_boardName}`, {//CREATE TABLE IF NOT EXI
     num: {// "num" int unsigned NOT NULL,
         type: Sequelize.INTEGER,// Post ID / Post number
         allowNull: false,
+        unique: 'num_subnum_index',// UNIQUE num_subnum_index ("num", "subnum"),
     },
     subnum: {// "subnum" int unsigned NOT NULL,
-        type: Sequelize.INTEGER,// TODO unknown function
+        type: Sequelize.INTEGER,// Appears to be used internally by Foolfuuka for ghost posts. Looks like scraped posts always have a value of 0 here
         allowNull: false,
+        unique: 'num_subnum_index',// UNIQUE num_subnum_index ("num", "subnum"),
     },
     thread_num: {// "thread_num" int unsigned NOT NULL DEFAULT '0',
         type: Sequelize.INTEGER,// Thread ID, also post ID number of OP of the thread
@@ -152,9 +186,10 @@ const Board = sequelize.define(`${global_boardName}`, {//CREATE TABLE IF NOT EXI
 
 
 //CREATE TABLE IF NOT EXISTS "%%BOARD%%_threads" (    
-const Thread = sequelize.define(`${global_boardName}`, {
+const thread = sequelize.define(`${global_boardName}`, {
     thread_num: {// "thread_num" int unsigned NOT NULL,
         type: Sequelize.INTEGER,
+        primaryKey: true,// primary key
         allowNull: false,
     },
     time_op: {// "time_op" int unsigned NOT NULL,
@@ -164,7 +199,6 @@ const Thread = sequelize.define(`${global_boardName}`, {
     time_last: {// "time_last" int unsigned NOT NULL,
         type: Sequelize.INTEGER,
         allowNull: false,
-
     },
     time_bump: {// "time_bump" int unsigned NOT NULL,
         type: Sequelize.INTEGER,
@@ -206,33 +240,41 @@ const Thread = sequelize.define(`${global_boardName}`, {
 
 
 // CREATE TABLE IF NOT EXISTS "%%BOARD%%_images" (
-const Thread = sequelize.define(`${global_boardName}_images`, {
+const images = sequelize.define(`${global_boardName}_images`, {
     media_id: {// "media_id" int unsigned NOT NULL auto_increment,
         type: Sequelize.INTEGER,
+        primaryKey: true,// primary key
         allowNull: false,
     },
     media_hash: {// "media_hash" varchar(25) NOT NULL,
         type: Sequelize.STRING(25),
         allowNull: false,
+        unique: 'media_hash_index',// UNIQUE media_hash_index ("media_hash"),
     },
-    todo: {// "media" varchar(20),
+    media: {// "media" varchar(20),
         type: Sequelize.STRING(20),
         allowNull: false,
     },
-    todo: {// "preview_op" varchar(20),
+    preview_op: {// "preview_op" varchar(20),
         type: Sequelize.STRING(20),
     },
-    todo: {// "preview_reply" varchar(20),
+    preview_reply: {// "preview_reply" varchar(20),
         type: Sequelize.STRING(20),
     },
-    todo: {// "total" int(10) unsigned NOT NULL DEFAULT '0',
+    total: {// "total" int(10) unsigned NOT NULL DEFAULT '0',
         type: Sequelize.BIGINT(10),
         allowNull: false,
         defaultValue: 0,
     },
-    todo: {// "banned" smallint unsigned NOT NULL DEFAULT '0',
+    banned: {// "banned" smallint unsigned NOT NULL DEFAULT '0',
         type: Sequelize.SMALLINT,
         allowNull: false,
         defaultValue: 0,
     },
 });
+
+
+exports.sequelize = sequelize;
+exports.post = post;
+exports.thread = thread;
+exports.images = images;
