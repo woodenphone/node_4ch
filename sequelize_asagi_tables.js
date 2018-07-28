@@ -37,10 +37,14 @@ sequelize
 const global_boardName = 'g'// Temporary placeholder
 
 
-const post = sequelize.define(`${global_boardName}`, {//CREATE TABLE IF NOT EXISTS "%%BOARD%%" (
+
+//CREATE TABLE IF NOT EXISTS "%%BOARD%%" (
+const Post = sequelize.define(`${global_boardName}`,
+{// Column definitions
     doc_id: {// "doc_id" int unsigned NOT NULL auto_increment,
         type: Sequelize.INTEGER,
         primaryKey: true,// primary key
+        autoIncrement: true,
         allowNull: false,
         unique: 'BoardNameUniqueIndex',
     },
@@ -171,25 +175,27 @@ const post = sequelize.define(`${global_boardName}`, {//CREATE TABLE IF NOT EXIS
     },
     poster_hash: {// "poster_hash" varchar(8),
         type: Sequelize.STRING(8),// TODO: Unknown function
-        allowNull: false,
-        defaultValue: false,
     },
     poster_country: {// "poster_country" varchar(2),
         type: Sequelize.STRING(2),// TODO: Unknown function
-        allowNull: false,
-        defaultValue: false,
     },
     exif: {// "exif" text,
         type: Sequelize.TEXT,// TODO: Unknown function
     },
-});
+},
+{// Table options
+    freezeTableName: true
+}
+);
 
 
 //CREATE TABLE IF NOT EXISTS "%%BOARD%%_threads" (    
-const thread = sequelize.define(`${global_boardName}`, {
+const Thread = sequelize.define(`${global_boardName}_threads`,
+{// Column definitions
     thread_num: {// "thread_num" int unsigned NOT NULL,
         type: Sequelize.INTEGER,
         primaryKey: true,// primary key
+        autoIncrement: true,
         allowNull: false,
     },
     time_op: {// "time_op" int unsigned NOT NULL,
@@ -236,14 +242,19 @@ const thread = sequelize.define(`${global_boardName}`, {
         allowNull: false,
         defaultValue: false,
     },
+},
+{// Table options
+    freezeTableName: true
 });
 
 
 // CREATE TABLE IF NOT EXISTS "%%BOARD%%_images" (
-const images = sequelize.define(`${global_boardName}_images`, {
+const Image = sequelize.define(`${global_boardName}_images`,
+{// Column definitions
     media_id: {// "media_id" int unsigned NOT NULL auto_increment,
         type: Sequelize.INTEGER,
         primaryKey: true,// primary key
+        autoIncrement: true,
         allowNull: false,
     },
     media_hash: {// "media_hash" varchar(25) NOT NULL,
@@ -271,10 +282,13 @@ const images = sequelize.define(`${global_boardName}_images`, {
         allowNull: false,
         defaultValue: 0,
     },
+},
+{// Table options
+    freezeTableName: true
 });
 
 
 exports.sequelize = sequelize;
-exports.post = post;
-exports.thread = thread;
-exports.images = images;
+exports.Post = Post;
+exports.Thread = Thread;
+exports.Image = Image;

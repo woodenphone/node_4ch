@@ -1,5 +1,6 @@
 // 4ch_sequelize_tables.js
 // sequelize DB / table definitions
+// These are not designed to be good. They merely have to function during development.
 const Sequelize = require('sequelize');
 
 // Connect to the DB
