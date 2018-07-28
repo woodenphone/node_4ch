@@ -33,6 +33,7 @@ const db = require('./sequelize_asagi_tables')// Asagi-style DB schema and setup
 
 const global_siteURL = 'https://a.4cdn.org'
 const global_boardName = 'g'
+const global_savepath = 'debug/'
 //const global_threadID = '66770725'
 
 
@@ -591,18 +592,21 @@ async function insertPost(postData, threadId, boardName) {
             },
         )
         .then( async function insertPost_afterMd5Search (md5SearchRow) {
-            logger.trace('insertPost_afterMd5Search md5SearchRow=', md5SearchRow)
+            logger.trace('insertPost_afterMd5Search() md5SearchRow=', md5SearchRow)
             if (md5SearchRow) {
                 logger.debug('Image is already in the DB')
                 // If MD5 found, use that as our entry in media table
                 var mediaId = md5SearchRow.media_id
-                logger.debug('mediaId: ', mediaId)
+                logger.debug('insertPost_afterMd5Search() mediaId=', mediaId)
                 return insertPostFinal(postData, threadId, mediaId)
             } else {
                 logger.debug(`Image ${postData.md5} is not in the DB`)
                 // Download image
-                mediaId = await downloadApiPostMedia(postData)
-                return insertPostFinal(postData, threadId, mediaId)
+                downloadApiPostMedia(postData)
+                .then( (mediaId) => {
+                    logger.debug(`Image ${postData.md5} has been inserted with media_id ${mediaId}`)
+                    return insertPostFinal(postData, threadId, mediaId)
+                }) 
             }
         })
     } else {
@@ -613,7 +617,25 @@ async function insertPost(postData, threadId, boardName) {
     }
 }
 
+function generateMediaFullFilepath(basePath, boardName, tim, ext) {
+    // https://desu-usergeneratedcontent.xyz/desu/image/1532/60/15326055533915.jpg
+    // boardName/image/1234/56/123456789.ext
+    tim = tim.toString()
+    subdir_a = tim.slice(0,3)
+    subdir_b = tim.slice(3,4)
+    var fullFilePath = `${basePath}${boardName}/image/${subdir_a}/${subdir_b}/${tim}${ext}`
+    return fullFilePath
+}
 
+function generateMediaThumbFilepath(basePath, boardName, tim) {
+    // https://desu-usergeneratedcontent.xyz/desu/thumb/1532/60/15326055533915s.jpg
+    // boardName/thumb/1234/56/123456789s.jpg
+    tim = tim.toString()
+    subdir_a = tim.slice(0,3)
+    subdir_b = tim.slice(3,4)
+    var fullFilePath = `${basePath}${boardName}/thumb/${subdir_a}/${subdir_b}/${tim}s.jpg`
+    return fullFilePath
+}
 
 async function downloadApiPostMedia(postData) {//WIP
     logger.debug('downloadApiPostMedia()')
@@ -625,10 +647,10 @@ async function downloadApiPostMedia(postData) {//WIP
     // Decide where to save each file
     // Images: http(s)://i.4cdn.org/board/tim.ext
     var fullURL = `https://i.4cdn.org/${global_boardName}/${postData.tim}${postData.ext}`
-    var fullFilePath = `debug/${global_boardName}/${postData.tim}${postData.ext}`
+    var fullFilePath = generateMediaFullFilepath(basePath=global_savepath, boardName=global_boardName, tim=postData.tim, ext=postData.ext)
     // Thumbnails: http(s)://i.4cdn.org/board/tims.jpg
     var thumbURL = `https://i.4cdn.org/${global_boardName}/${postData.tim}s.jpg`
-    var thumbFilePath = `debug/${global_boardName}/thumb/${postData.tim}s.jpg`
+    var thumbFilePath = generateMediaThumbFilepath(basePath=global_savepath, boardName=global_boardName, tim=postData.tim)
     // Save full image
     downloadMedia(fullURL, fullFilePath)
     // Save thumb
@@ -675,7 +697,7 @@ async function downloadMedia(url, filepath) {
 
 function insertPostFinal (postData, threadId, mediaId) {
     // Insert the post's data
-    logger.debug('Inserting post data')
+    logger.debug('Inserting post data postData.no=',postData.no)
     if (!(postData.tim)) {// TODO: Move to seperate function
         // logger.warn('tim is not there! postData: ',postData)
         postData.tim = null    
