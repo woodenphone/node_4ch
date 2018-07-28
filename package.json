@@ -1,0 +1,24 @@
+{
+    "name": "4chanarchiver",
+    "version": "0.1.0",
+    "description": "Tool to archive 4chan written in NodeJS - Autism Edition",
+    "main": "src/main.js",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/Wolvan/node_4ch.git"
+    },
+    "keywords": [
+        "4chan",
+        "archive",
+        "archiving"
+    ],
+    "author": "Ctrl-S",
+    "contributors": [
+        "Wolvan"
+    ],
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/Wolvan/node_4ch/issues"
+    },
+    "homepage": "https://github.com/Wolvan/node_4ch#readme"
+}
