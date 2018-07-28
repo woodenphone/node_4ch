@@ -4,3 +4,4 @@ debug/
 test_thread.json
 *.db
 *.sqlite
+*.sqlite-journal
