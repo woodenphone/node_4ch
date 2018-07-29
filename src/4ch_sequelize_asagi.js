@@ -3,6 +3,7 @@
 // Library imports
 // const jsonFile = require('jsonfile')
 const fs = require('fs-extra');
+const path = require('path')
 // const lupus = require('lupus');
 const Sequelize = require('sequelize');
 const rp = require('request-promise')
@@ -29,8 +30,6 @@ logger.info('Logging started.')
 const db = require('./sequelize_asagi_tables')// Asagi-style DB schema and setup
   
 
-
-
 const global_siteURL = 'https://a.4cdn.org'
 const global_boardName = 'g'
 const global_savepath = 'debug/'
@@ -40,10 +39,10 @@ const global_savepath = 'debug/'
 
 
 
-// module.exports.devMain = devMain;
-devMain()
 
-function devMain() {
+main()
+
+function main() {
     // Run stuff 
     // Create tables
     // force: true will drop the table if it already exists
@@ -56,14 +55,14 @@ function devMain() {
     // .then(handleThread(global_siteURL, global_boardName, global_threadID))
     // .then(handleWholeThreadAtOnce( global_siteURL, global_boardName, global_threadID ) )
     // .then(handleMultipleThreadsSequentially(global_siteURL, global_boardName, global_threadIds))
-    .then(handleThreads(global_siteURL, global_boardName))
+    .then(handleApiThreadsPage(global_siteURL, global_boardName))
     .catch( (err) => {
         logger.error(err)
     });
 }
 
-function handleThreads(siteURL, boardName) {
-    // 
+function handleApiThreadsPage(siteURL, boardName) {
+    // Process threads from the API's threads.json endpoint
     logger.debug('Processing threads.json for board: ',boardName)
     var threadsUrl = `${siteURL}/${boardName}/threads.json`
     fetchApiJson(threadsUrl)
@@ -132,6 +131,7 @@ async function handleMultipleThreadsSequentiallyWithMediaAlso(siteURL, boardName
     logger.debug('Finished processing threads.')
     return
 };
+
 
 // Functions that check if a post is something
 function isPostSticky(postData) {
@@ -213,6 +213,7 @@ function getThreadTimeLast(threadData) {
     return threadData.posts[threadData.posts.length-1].time
 }
 // /Functions that check something about a thread
+
 
 function fetchApiJson(url) {
     // Ratelimit API use
@@ -404,28 +405,6 @@ function compareFindDeletedPostRows (postRows, apiPosts) {
     return deletedPostRows
 }
 
-// function compareFindNewApiPosts (postRows, apiPosts) {
-//     // Produce an array of 4ch API post objects that do not match any item in the given post DB rows
-//     logger.trace('postRows, apiPosts:', postRows, apiPosts)
-//     var newApiPosts = []
-//     for (let i = 0; i< apiPosts.length-1; i++){
-//         var apiPost = apiPosts[i]
-//         var matched = false
-//         for (let j = 0; j< postRows.length-1; j++){
-//             dbPost = postRows[j]
-//             if (dbPost.postNumber == apiPost.no) {
-//                 matched = true// If in API but not DB
-//             }
-//         }
-//         if (matched){
-//             newApiPosts.push(apiPost)
-//         }
-//     }
-//     logger.trace('newApiPosts:', newApiPosts)
-//     return newApiPosts
-// }
-
-
 function compareFindNewApiPosts (postRows, apiPosts) {// WIP
     // Produce an array of 4ch API post objects that do not match any item in the given post DB rows
     //logger.debug('postRows, apiPosts:', postRows, apiPosts)
@@ -461,123 +440,6 @@ function isitemInobj(obj, itemName) {
     var inObj = ( itemName in obj )
     return inObj
 }
-
-
-
-
-
-// function handleThread(siteURL, boardName, threadId) {
-//     // Load a thread from the API; then lookup and insert it, its posts, and its media
-//     // Generate API URL
-//     var threadURL = `${siteURL}/${boardName}/thread/${threadId}.json`
-//     logger.info('handleThread() processing thread: ',threadURL)
-//     // Load thread API URL
-//     rp(threadURL)
-//     .then( (htmlString) => {
-//         // Decode JSON
-//         threadData = JSON.parse(htmlString)
-//         // Process thread data
-//         return handleThreadData (threadData)
-//     })
-//     .catch( (err) => {
-//         logger.error(err)
-//     })    
-// }
-
-// function handleThreadData (threadData) {
-//     // Check if thread has entry in the db; if not make one; then lookup and insert its posts and media.
-//     return db.sequelize.transaction( (trans) => {
-//         // Extract thread-level data from OP
-//         var opPostData = threadData.posts[0]
-//         var threadId = opPostData.no
-//         // Lookup threadId in the DB
-//         return db.Thread.findOne(
-//             {
-//             where:  {
-//                 threadNumber: threadId,
-//                 }
-//             },
-//             {transaction: trans}
-//         ).then( (threadRow) => {
-//             if (threadRow) {
-//                 logger.debug('Thread already in DB: ', threadId)
-//                 // TODO Update thread entry
-//             } else {
-//                 logger.debug('Creating entry for thread: ', threadId)
-//                 // Create entry for thread
-//                 return db.Thread.create({
-//                     threadNumber: threadId,
-//                     time_op: opPostData.time,//TODO
-//                     time_last: getThreadTimeLast(threadData),//TODO
-//                     time_bump: getThreadTimeLastBumped(threadData),//TODO find better way of calculating this value
-//                     time_ghost: null,//TODO
-//                     time_ghost_bump: null,//TODO
-//                     time_last_modified: getThreadTimeLastModified(threadData),//TODO Should be calculating by inspecting every post, and updating db to highest only if the highest is greater than the DB
-//                     nreplies: opPostData.replies,//TODO We should actually count the entries in the DB
-//                     nimages: opPostData.images,//TODO We should actually count the entries in the DB
-//                     sticky: isPostSticky(opPostData),
-//                     locked: isPostLocked(opPostData),
-//                 },
-//                 {transaction: trans}
-//                 ).then( (threadRow) => {
-//                     logger.trace('Thread added to DB: ', threadRow)
-//                 })
-//                 .catch( (err) => {
-//                     logger.error(err)
-//                 })
-//             }
-//         }).then( () => {
-//             return iterateThreadPosts(threadData, threadId, trans, boardName)
-//         })
-//         .catch( (err) => {
-//             logger.error(err)
-//         })
-//     })
-//     .then( (result) => {
-//         logger.debug('Transaction finished: ', threadId, result)
-//     })
-//     .catch( (err) =>{
-//         logger.error(err)
-//     })
-// }
-
-// function iterateThreadPosts(threadData, threadId, trans, boardName) {
-//     // Check the DB for posts and insert them and their media if absent
-//     logger.trace('Iterating over test thread:',threadData)
-//     lupus(0, threadData.posts.length, (n) => {
-//         logger.trace('processing post index:', n)
-//         var postData = threadData.posts[n]
-//         decideThenInsertPost(postData, threadId, trans, boardName)
-//     }, () => {
-//         logger.trace('finished lupus loop')
-//     })
-// }
-
-// function decideThenInsertPost (postData, threadId, trans, boardName) {
-//     // Check the DB for a post and insert it and its media if absent
-//     logger.debug('decideThenInsertPost() postData.no:', postData.no)
-//     // Does post exist in DB?
-//     return db.Post.findOne(
-//         {
-//         where:  {
-//             postNumber: postData.no,
-//             thread_num: threadId,
-//         }
-//         },
-//         {transaction: trans}
-//     ).then( (existingVersionOfPost) => {
-//         logger.trace('existingVersionOfPost', existingVersionOfPost)
-//         if (existingVersionOfPost) {
-//             logger.debug(`Post ${existingVersionOfPost.postNumber} is already in the DB`)
-//         } else {
-//             logger.debug('Post is not in the DB')
-//             return insertPost(postData, threadId, trans, boardName)
-//         }
-//     })
-//     .catch( (err) => {
-//         logger.error(err)
-//     })
-// }
 
 async function insertPost(postData, threadId, boardName) {
     // Insert a post without looking at the DB first
@@ -658,6 +520,7 @@ function downloadApiPostMedia(postData) {//WIP
         downloadMedia(fullURL, fullFilePath)
         // Save thumb
         downloadMedia(thumbURL, thumbFilePath)
+        // TODO: Validate image data (size and md5)
         // Insert row into Images table
         return db.Image.create(
             {
@@ -681,23 +544,28 @@ function downloadApiPostMedia(postData) {//WIP
 };
 
 
-async function downloadMedia(url, filepath) {
+function downloadMedia(url, filePath) {
     // Save a target URL to a target path
-    logger.trace('before limiter; url, filepath: ', url, filepath)
-    logger.warn('Media downloading disabled!')
-    return
-    limiter.removeTokens(1, function() {
-        logger.debug('Saving URL: ', url, 'to filepath: ',filepath)
-        // return
-        request.get(url)
-        .on('error', function(err) {
-            logger.error('err', err)
-            console.log('downloadMedia() err ',err)
-            throw(err)
+    logger.trace('before limiter; url, filePath=', url, filePath)
+    // logger.warn('Media downloading disabled!')
+    // return
+    // Ensure destination dir exists
+    destinationDir = path.dirname(filePath)
+    fs.ensureDir(destinationDir)
+    .then( () =>  {
+        // Download and save file to disk
+        limiter.removeTokens(1, function() {
+            logger.debug('Saving URL=', url, 'to filePath=',filePath)
+            // return
+            request.get(url)
+            .on('error', function(err) {
+                logger.error('err', err)
+                console.log('downloadMedia() err=',err)
+                throw(err)
+            })
+            .pipe(fs.createWriteStream(filePath))
         })
-        .pipe(fs.createWriteStream(filepath))
     })
-    return
 };
 
 
