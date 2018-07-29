@@ -1,14 +1,14 @@
 // 4ch_sequelize_asagi.js
 // Save 4chan threads/posts/media using a DB with the tables Asagi uses
 // Library imports
-const jsonFile = require('jsonfile')
+// const jsonFile = require('jsonfile')
 const fs = require('fs-extra');
-const lupus = require('lupus');
+// const lupus = require('lupus');
 const Sequelize = require('sequelize');
 const rp = require('request-promise')
 const rp_errors = require('request-promise/errors');
 const request = require('request');// for file streaming
-const assert = require('assert');
+// const assert = require('assert');
 var RateLimiter = require('limiter').RateLimiter;
 var limiter = new RateLimiter(1, 1500);// MUST be above 1000
 
@@ -40,7 +40,8 @@ const global_savepath = 'debug/'
 
 
 
-module.exports.devMain = devMain;
+// module.exports.devMain = devMain;
+devMain()
 
 function devMain() {
     // Run stuff 
@@ -637,41 +638,45 @@ function generateMediaThumbFilepath(basePath, boardName, tim) {
     return fullFilePath
 }
 
-async function downloadApiPostMedia(postData) {//WIP
-    logger.debug('downloadApiPostMedia()')
-    // logger.debug('postData:', postData)
-    var postId = postData.no
-    var md5 = postData.md5
-    logger.debug('md5:', md5)
-    // Fetch the media files for the post
-    // Decide where to save each file
-    // Images: http(s)://i.4cdn.org/board/tim.ext
-    var fullURL = `https://i.4cdn.org/${global_boardName}/${postData.tim}${postData.ext}`
-    var fullFilePath = generateMediaFullFilepath(basePath=global_savepath, boardName=global_boardName, tim=postData.tim, ext=postData.ext)
-    // Thumbnails: http(s)://i.4cdn.org/board/tims.jpg
-    var thumbURL = `https://i.4cdn.org/${global_boardName}/${postData.tim}s.jpg`
-    var thumbFilePath = generateMediaThumbFilepath(basePath=global_savepath, boardName=global_boardName, tim=postData.tim)
-    // Save full image
-    downloadMedia(fullURL, fullFilePath)
-    // Save thumb
-    downloadMedia(thumbURL, thumbFilePath)
-    // Insert row into Images table
-    return db.Image.create(
-        {
-            media_hash: md5,
-            media: fullFilePath,// TODO Verify format Asagi uses
-            preview_op: null,//'local/path/to/preview_op.ext',// TODO
-            preview_reply: thumbFilePath,// TODO Verify format Asagi uses
-        },
-    )
-    .then(function downloadApiPostMedia_afterImageInsert (imageRow) {
-        logger.debug('Image added to DB: imageRow.id=', imageRow.id)
-        var mediaId = imageRow.id
-        return mediaId
-     })
-    .catch( function downloadApiPostMedia_ErrorHandler (err) {
-        logger.error(err)
-        throw(err)
+function downloadApiPostMedia(postData) {//WIP
+    return new Promise(
+        function (resolve, reject) {
+        logger.debug('downloadApiPostMedia()')
+        // logger.debug('postData:', postData)
+        var postId = postData.no
+        var md5 = postData.md5
+        logger.debug('md5:', md5)
+        // Fetch the media files for the post
+        // Decide where to save each file
+        // Images: http(s)://i.4cdn.org/board/tim.ext
+        var fullURL = `https://i.4cdn.org/${global_boardName}/${postData.tim}${postData.ext}`
+        var fullFilePath = generateMediaFullFilepath(basePath=global_savepath, boardName=global_boardName, tim=postData.tim, ext=postData.ext)
+        // Thumbnails: http(s)://i.4cdn.org/board/tims.jpg
+        var thumbURL = `https://i.4cdn.org/${global_boardName}/${postData.tim}s.jpg`
+        var thumbFilePath = generateMediaThumbFilepath(basePath=global_savepath, boardName=global_boardName, tim=postData.tim)
+        // Save full image
+        downloadMedia(fullURL, fullFilePath)
+        // Save thumb
+        downloadMedia(thumbURL, thumbFilePath)
+        // Insert row into Images table
+        return db.Image.create(
+            {
+                media_hash: md5,
+                media: fullFilePath,// TODO Verify format Asagi uses
+                preview_op: null,//'local/path/to/preview_op.ext',// TODO
+                preview_reply: thumbFilePath,// TODO Verify format Asagi uses
+            },
+        )
+        .then(function downloadApiPostMedia_afterImageInsert (imageRow) {
+            logger.debug('Image added to DB: imageRow.media_id=', imageRow.media_id)
+            var mediaId = imageRow.media_id
+            resolve(mediaId)
+        })
+        .catch( function downloadApiPostMedia_ErrorHandler (err) {
+            logger.error(err)
+            throw(err)
+            reject(err)
+        })
     })
 };
 

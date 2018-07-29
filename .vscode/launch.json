@@ -14,6 +14,12 @@
             "request": "launch",
             "name": "Launch Program",
             "program": "${workspaceFolder}\\build\\main.js"
+        },
+        {// For faster coding/debugging
+            "type": "node",
+            "request": "launch",
+            "name": "Launch this file",
+            "program": "${file}"
         }
     ]
 }
