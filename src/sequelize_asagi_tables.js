@@ -34,7 +34,7 @@ sequelize
 });
 
 
-const global_boardName = 'g'// Temporary placeholder
+const global_boardName = 'g';// Temporary placeholder
 
 
 
