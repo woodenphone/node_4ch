@@ -46,3 +46,5 @@
 //     '66803850',
 //     '66822790',
 // ]
+var a = 'dummy'
+module.exports.a = a
