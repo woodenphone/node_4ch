@@ -704,7 +704,7 @@ async function downloadApiPostMedia(postData) {//WIP
             preview_reply: thumbFilePath,// TODO Verify format Asagi uses
         },
     )
-    .then( async function downloadApiPostMedia_afterImageInsert (imageRow) {
+    .then(function downloadApiPostMedia_afterImageInsert (imageRow) {
         logger.debug('Image added to DB: imageRow.id=', imageRow.id)
         var mediaId = imageRow.id
         return mediaId
