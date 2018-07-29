@@ -1,5 +1,7 @@
+"use strict";
 // test_data.js
 // various test test_data
+
 
 // var global_testThreadData = jsonFile.readFileSync('git_ignored\\test_thread.json');
 // logger.log('info', 'global_testThreadData', {'global_testThreadData':global_testThreadData})
@@ -46,3 +48,5 @@
 //     '66803850',
 //     '66822790',
 // ]
+var a = 'dummy'
+module.exports.a = a

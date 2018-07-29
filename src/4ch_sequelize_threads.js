@@ -1,3 +1,4 @@
+"use strict";
 // 4ch_sequelize_threads.js
 // Save 4chan threads/posts using a DB
 // Library imports

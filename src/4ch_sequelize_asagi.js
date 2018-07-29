@@ -1,3 +1,4 @@
+"use strict";
 // 4ch_sequelize_asagi.js
 // Save 4chan threads/posts/media using a DB with the tables Asagi uses
 // Library imports
@@ -40,7 +41,7 @@ const global_savepath = 'debug/'
 
 
 
-main()
+main();
 
 function main() {
     // Run stuff 
@@ -49,12 +50,7 @@ function main() {
     db.Post.sync({ force: false })
     .then(db.Image.sync({ force: false }))
     .then(db.Thread.sync({ force: false }))
-    // Insert a thread
-    // .then(handleThreadData(global_testThreadData))
-    // .then(decideThenInsertPost (postData, threadId, boardName))
-    // .then(handleThread(global_siteURL, global_boardName, global_threadID))
-    // .then(handleWholeThreadAtOnce( global_siteURL, global_boardName, global_threadID ) )
-    // .then(handleMultipleThreadsSequentially(global_siteURL, global_boardName, global_threadIds))
+    // Grab threads
     .then(handleApiThreadsPage(global_siteURL, global_boardName))
     .catch( (err) => {
         logger.error(err)

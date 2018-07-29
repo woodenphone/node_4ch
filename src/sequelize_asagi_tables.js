@@ -1,3 +1,4 @@
+"use strict";
 // sequelize_asagi_tables.js
 // sequelize definitions for the tables and columns Asagi uses.
 // For information on datatypes sequelize uses, see: http://docs.sequelizejs.com/variable/index.html#static-variable-DataTypes
