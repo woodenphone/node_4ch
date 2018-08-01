@@ -40,7 +40,7 @@ const global_savepath = 'debug/'
 
 
 
-
+// Start doing things
 main();
 
 function main() {
@@ -111,6 +111,17 @@ function loopThreadsApi () {// WIP TODO still figuring this out
     })
 }
 
+function insertThread(threadData) {
+    var threadURL = `${siteURL}/${boardName}/thread/${threadId}.json`
+    logger.info('processing thread: ',threadURL)
+    // Load thread API URL
+    var posts = []
+    fetchApiJson(threadURL)
+    .then( (threadData) => {
+        posts
+    })
+    return posts
+}
 
 
 function joinApiThreadsLists (apiThreads) {
