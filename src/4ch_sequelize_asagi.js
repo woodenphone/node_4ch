@@ -75,6 +75,9 @@ function handleApiThreadsPage(siteURL, boardName) {
     })
 }
 
+
+
+// ===== WIP =====
 function loopThreadsApi () {// WIP TODO still figuring this out
     // Init persistant stores
     var threadQueue = []
@@ -110,6 +113,16 @@ function loopThreadsApi () {// WIP TODO still figuring this out
     // for media in mediaPostUpdateQueue: "UPDATE posts.media_id WHERE posts.hash = thisHash"
     })
 }
+
+function insertThreads(threadQueue) {
+    // Get OP data
+    // INSERT thread into board.threads table
+    return posts
+}
+
+
+
+// ===== /WIP =====
 
 function insertThread(threadData) {
     var threadURL = `${siteURL}/${boardName}/thread/${threadId}.json`
