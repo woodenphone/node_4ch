@@ -16,12 +16,13 @@
 // ===== WIP =====
 function loopThreadsApi () {// WIP TODO still figuring this out
     // Init persistant stores
+    var lastUpdatedcache = []// model.js.cacheThread
     var threadQueue = []
     var postQueue = []
     var mediaToGrabQueue = []
     var mediaPostUpdateQueue = []
-    while (true) {
-
+    // Begin work
+    while (true) {// TODO: Look into more efficient loop mechanisms
         // Load API data
         var threadsUrl = `${siteURL}/${boardName}/threads.json`
         fetchApiJson(threadsUrl)
@@ -40,22 +41,32 @@ function loopThreadsApi () {// WIP TODO still figuring this out
                 threadQueue.push(apiThreads[i].threads)
             }
         }
+
+        
+        
+        
         // INSERT/UPDATE threads and download their posts
         postQueue += insertThreads(threadQueue)
 
         // INSERT/UPDATE posts from queue into the DB, recording what media was associated with them
-        mediaQueue += insertPosts(threadQueue)
+        mediaToGrabQueue += insertPosts(postQueue)
 
         // INSERT media after downloading it, and give back a listing of the successfully donwloaded hashes
-        mediaPostUpdateQueue += grabAndInsertMedia(mediaQueue)
+        mediaPostUpdateQueue += grabAndInsertMedia(mediaToGrabQueue)
         
         // UPDATE media posts WHERE media_hash = NULL to link them to their media
-        for media in mediaPostUpdateQueue: "UPDATE posts.media_id WHERE posts.hash = thisHash"
+        // for media in mediaPostUpdateQueue: "UPDATE posts.media_id WHERE posts.hash = thisHash"
+        mediaPostUpdateQueue = linkPostsToMedia(mediaPostUpdateQueue)
         })
+
         return 'debug'// TODO REMOVEME Prevent loop during development
     }
 }
 
+function decideIfDoUpdate (threadData) {
+    // Decide which threads to process based on the time they were lsat uppdated
+    return
+}
 
 function insertThreads(threadsList) {// TODO
     // INSERT/UPDATE threads and download their posts
@@ -68,16 +79,20 @@ function insertThreads(threadsList) {// TODO
     return postsList
 }
 
-
 function insertOneThread(thread){// TODO
     /// INSERT/UPDATE a thread and download its posts
     // Get OP data
-    // INSERT thread into board.threads table
+    // If new: INSERT thread into board.threads table
+    // If existing and modified: UPDATE thread entry
     return postsList
 }
 
 function insertPosts(postsList) {// TODO
     // INSERT/UPDATE posts into the DB, recording what media was associated with them
+    for (var i = 1; i< postsList.length; i++){
+        post = postsList[i]
+        insertPost(post)
+    }
     return media
 
 function insertPost(post) {// TODO
@@ -87,22 +102,36 @@ function insertPost(post) {// TODO
     return media
 }
 
-
-function handleimages(images) {
+function grabAndInsertMedia(images) {
     for (var i = 1; i< images.length; i++){
         image = images[i]
-        handleImage(image)
+        grabAndInsertSingleMedia(image)
     }
     return
 }
 
-function handleImage(image) {
+function grabAndInsertSingleMedia(image) {
     // Check if DL needed
+    // SELECT storedhash FROM board_img WHERE storedhash = remoteHash LIMIT 1
     // Optionally download files
-    // UPDATE posts with matching hash
     return
 }
 
+function linkPostsToMedia(mediaList) {
+    // UPDATE media posts WHERE media_hash = NULL to link them to their media
+    // for media in mediaPostUpdateQueue: "UPDATE posts.media_id WHERE posts.hash = thisHash"
+    var failedMediaItems = []
+    for (var i = 1; i< mediaList.length; i++){
+        media = mediaList[i]
+        failedItems += linkSinglePostToMedia(media)
+    }
+    return failedMediaItems
+}
 
+function linkSinglePostToMedia(media) {
+    // UPDATE media posts WHERE media_hash = NULL to link them to their media
+    // for media in mediaPostUpdateQueue: "UPDATE posts.media_id WHERE posts.hash = thisHash"
+    return
+}
 
 // ===== /WIP =====

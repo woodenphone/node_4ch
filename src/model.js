@@ -11,16 +11,14 @@ var cacheThread = {// To retain in local RAM to remember when thread was last pr
     lastChecked: 0,//Local timestamp, used for throttling: allowUpdate = (currentTime+delay > lastChecked)
     remoteLastModified: 0,// Remote last updated, watch for changes: updated = (oldValue === newValue)
     posts: [
-        {
-            no:0,// Remote post number
-            time:0,// Remote last modified value
-        },
+        insertedPost,
+        //...
     ]
 }
 
 //TODO
 var insertedPost = {// To retain in local RAM to remember when post was last processed
-    id: 0,// Remote thread ID
+    no: 0,// Remote thread ID
     lastChecked: 0,//Local timestamp
     remoteLastModified: 0,// Remote last updated
 }
