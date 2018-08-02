@@ -77,52 +77,7 @@ function handleApiThreadsPage(siteURL, boardName) {
 
 
 
-// ===== WIP =====
-function loopThreadsApi () {// WIP TODO still figuring this out
-    // Init persistant stores
-    var threadQueue = []
-    var postQueue = []
-    var mediaToGrabQueue = []
-    var mediaPostUpdateQueue = []
 
-    // Load API data
-    var threadsUrl = `${siteURL}/${boardName}/threads.json`
-    fetchApiJson(threadsUrl)
-    .then( (apiThreads) => {
-
-    // Run comparisons to decide what order to process threads in
-    // Page 1
-    threadQueue.push(apiThreads[0].threads)
-    // Last two pages
-    threadQueue.push(apiThreads[-1].threads)
-    threadQueue.push(apiThreads[-2].threads)
-    middleThreads = []// Other pages
-    if (threads.length > 3){
-        var apiThreadsLengthMinusTwo = apiThreads.length
-        for (var i = 1; i< apiThreadsLengthMinusTwo; i++){
-            threadQueue.push(apiThreads[i].threads)
-        }
-    }
-    // INSERT/UPDATE threads and download their posts
-    // postQueue += insertThreads(threadQueue)
-    // INSERT/UPDATE posts from queue into the DB, recording what media was associated with them
-    // mediaQueue += insertThreads(threadQueue)
-    // INSERT media after downloading it, and give back a listing of the successfully donwloaded hashes
-    // mediaPostUpdateQueue += grabAndInsertMedia(mediaQueue)
-    // UPDATE media posts WHERE media_hash = NULL to link them to their media
-    // for media in mediaPostUpdateQueue: "UPDATE posts.media_id WHERE posts.hash = thisHash"
-    })
-}
-
-function insertThreads(threadQueue) {
-    // Get OP data
-    // INSERT thread into board.threads table
-    return posts
-}
-
-
-
-// ===== /WIP =====
 
 function insertThread(threadData) {
     var threadURL = `${siteURL}/${boardName}/thread/${threadId}.json`
