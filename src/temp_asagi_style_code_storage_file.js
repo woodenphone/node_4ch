@@ -14,7 +14,7 @@
 
 
 // ===== WIP =====
-function loopThreadsApi () {// WIP TODO still figuring this out
+function loopBoardThreadsApi () {// WIP TODO still figuring this out
     // Init persistant stores
     var lastUpdatedCache = []// defined at model.js threadsCache
     var threadQueue = []
@@ -58,6 +58,8 @@ function loopThreadsApi () {// WIP TODO still figuring this out
         // UPDATE media posts WHERE media_hash = NULL to link them to their media
         // for media in mediaPostUpdateQueue: "UPDATE posts.media_id WHERE posts.hash = thisHash"
         mediaPostUpdateQueue = linkPostsToMedia(mediaPostUpdateQueue)
+
+        // postQueue should be empty by this point
         })
 
         return 'debug'// TODO REMOVEME Prevent loop during development
@@ -65,7 +67,7 @@ function loopThreadsApi () {// WIP TODO still figuring this out
 }
 
 function addThreadsToQueue(orderedThreads, threadqueue){
-    
+
     return threadqueue
 }
 
@@ -116,7 +118,7 @@ function insertOneThread (thread){// TODO
     return postsList
 }
 
-function insertPosts (postsList) {// TODO
+function insertAndUpdatePosts (postsList) {// TODO
     // INSERT/UPDATE posts into the DB, recording what media was associated with them
     for (var i = 1; i< postsList.length; i++){
         post = postsList[i]

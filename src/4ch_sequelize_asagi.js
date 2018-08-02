@@ -38,8 +38,6 @@ const global_savepath = 'debug/'
 
 
 
-
-
 // Start doing things
 main();
 
