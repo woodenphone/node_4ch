@@ -16,7 +16,7 @@
 // ===== WIP =====
 function loopThreadsApi () {// WIP TODO still figuring this out
     // Init persistant stores
-    var lastUpdatedcache = []// model.js.cacheThread
+    var lastUpdatedCache = []// defined at model.js threadsCache
     var threadQueue = []
     var postQueue = []
     var mediaToGrabQueue = []
@@ -29,21 +29,22 @@ function loopThreadsApi () {// WIP TODO still figuring this out
         .then( (apiThreads) => {
 
         // Run comparisons to decide what order to process threads in
+        var orderedThreads = []
         // Page 1
-        threadQueue.push(apiThreads[0].threads)
+        orderedThreads.push(apiThreads[0].threads)
         // Last two pages
-        threadQueue.push(apiThreads[-1].threads)
-        threadQueue.push(apiThreads[-2].threads)
+        orderedThreads.push(apiThreads[-1].threads)
+        orderedThreads.push(apiThreads[-2].threads)
         middleThreads = []// Other pages
         if (threads.length > 3){
             var apiThreadsLengthMinusTwo = apiThreads.length
             for (var i = 1; i< apiThreadsLengthMinusTwo; i++){
-                threadQueue.push(apiThreads[i].threads)
+                orderedThreads.push(apiThreads[i].threads)
             }
         }
 
-        
-        
+       
+        threadQueue = chooseThreadsToUpdate(orderedThreads)
         
         // INSERT/UPDATE threads and download their posts
         postQueue += insertThreads(threadQueue)
@@ -63,31 +64,59 @@ function loopThreadsApi () {// WIP TODO still figuring this out
     }
 }
 
-function decideIfDoUpdate (threadData) {
-    // Decide which threads to process based on the time they were lsat uppdated
-    return
+function addThreadsToQueue(orderedThreads, threadqueue){
+    
+    return threadqueue
 }
 
-function insertThreads(threadsList) {// TODO
+function chooseThreadsToUpdate (threads) {
+    // For threads.json
+    // Decide which threads to process based on the time they were lsat uppdated
+    threadsToUpdate = []
+    for (var i = 1; i< threads.length; i++){
+        thread = threads[i]
+        var doUpdate = decideIfDoThreadUpdate(thread)
+        if (doUpdate) {
+            threadsToUpdate.push(thread)
+        }
+    }
+    return threadsToUpdate
+}
+
+function decideIfDoThreadUpdate (threads) {
+    // For threads.json
+    // Decide which threads to process based on the time they were lsat uppdated
+    threadNumber = thread['no']
+    oldLastModified = lastUpdatedCache[threadNumber]['lastchecked']
+    newLastModified = thread['last_modified']
+    doUpdate = (newLastModified > oldLastModified)
+    return doUpdate
+}
+
+function insertThreads (threadsList) {// TODO
+    // For threads.json
     // INSERT/UPDATE threads and download their posts
-    
     var postsList = []
     for (var i = 1; i< threadsList.length; i++){
-        var threadNewPosts = insertOneThread(threadsList[i])
-        postsList += threadNewPosts
+        if (decideIfDoThreadUpdate(threadsList[i])) {
+            var threadNewPosts = insertOneThread(threadsList[i])
+            postsList += threadNewPosts
+        }
     }
     return postsList
 }
 
-function insertOneThread(thread){// TODO
+function insertOneThread (thread){// TODO
     /// INSERT/UPDATE a thread and download its posts
     // Get OP data
     // If new: INSERT thread into board.threads table
     // If existing and modified: UPDATE thread entry
+    // update RAM thread cache
+    lastUpdatedCache[threadNumber.tostring()]['lastChecked']
     return postsList
 }
 
-function insertPosts(postsList) {// TODO
+function insertPosts (postsList) {// TODO
     // INSERT/UPDATE posts into the DB, recording what media was associated with them
     for (var i = 1; i< postsList.length; i++){
         post = postsList[i]
@@ -95,14 +124,14 @@ function insertPosts(postsList) {// TODO
     }
     return media
 
-function insertPost(post) {// TODO
+function insertPost (post) {// TODO
     // INSERT/UPDATE a post into the DB, recording what media was associated with it
     // Get OP data
     // INSERT post
     return media
 }
 
-function grabAndInsertMedia(images) {
+function grabAndInsertMedia (images) {
     for (var i = 1; i< images.length; i++){
         image = images[i]
         grabAndInsertSingleMedia(image)
@@ -110,7 +139,7 @@ function grabAndInsertMedia(images) {
     return
 }
 
-function grabAndInsertSingleMedia(image) {
+function grabAndInsertSingleMedia (image) {
     // Check if DL needed
     // SELECT storedhash FROM board_img WHERE storedhash = remoteHash LIMIT 1
     // Optionally download files
