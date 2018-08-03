@@ -355,7 +355,9 @@ function updatePost(postApiData, postRow, postID, threadId) {// TODO
     // Test values to update
     var values = {
     // post deleted?
-    deleted: (false)
+    deleted: (false),
+    time_last_modified: postApiData.last_modified,
+    
     // media deleted?
     //
     }
