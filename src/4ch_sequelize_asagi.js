@@ -27,9 +27,13 @@ var logger = tracer.colorConsole({
 tracer.setLevel('debug')
 logger.info('Logging started.')
 
+
+
 // Local imports
 const db = require('./sequelize_asagi_tables')// Asagi-style DB schema and setup
-  
+const classes = require('./yet_another_model')// Class definitions
+
+
 
 const global_siteURL = 'https://a.4cdn.org'
 const global_boardName = 'g'
@@ -49,10 +53,58 @@ function main() {
     .then(db.Image.sync({ force: false }))
     .then(db.Thread.sync({ force: false }))
     // Grab threads
-    .then(handleApiThreadsPage(global_siteURL, global_boardName))
+    // .then(handleApiThreadsPage(global_siteURL, global_boardName))
+    .then(memCachedGrabBoard(global_siteURL, global_boardName))
     .catch( (err) => {
         logger.error(err)
     });
+}
+
+function memCachedGrabBoard (siteURL, boardName) {
+    var threadsCache = []
+    while (true) {
+        // Process threads from the API's threads.json endpoint
+        logger.debug('Processing threads.json for board: ',boardName)
+        var threadsUrl = `${siteURL}/${boardName}/threads.json`
+        fetchApiJson(threadsUrl)
+        .then( (apiThreads) => {
+            var apiThreadPairs = joinApiThreadsLists(apiThreads)
+            // Decide which threads to grab
+            for (var i = 0; i< apiThreadPairs.length; i++){
+                var threadId = apiThreadPairs[i].no
+                var lastModified = apiThreadPairs[i].last_modified
+                var thread = getCacheThread(threadsCache, threadId)
+                // Ensure we have a Thread object to do comparisons on
+                if (! (thread) ) {
+                    logger.debug('New thread: ',threadId)
+                    thread = classes.Thread(thread_num = threadId, lastGrabbed = 0)
+                }
+                // Check if we want to update this thread
+                if (thread.lastGrabbed < lastModified) {
+                    // Grab thread
+                    logger.debug('Thread needs update: ',threadId)
+                    handleWholeThreadAtOnce(siteURL, boardName, threadId)
+                    .then( () => {
+                        thread.lastGrabbed = Date.now()
+                    })
+                } else {
+                    logger.debug('Ignoring thread: ',threadId)
+                }
+            }
+        })
+    }
+}
+
+function getCacheThread(threadsCache, threadId) {
+    var match
+    for (var i = 0; i< pageThreads.length; i++){
+        thread = threadsCache[i]
+        if (thread.thread_num === threadId) {
+            match = thread
+            break
+        }
+    }
+    return match
 }
 
 function handleApiThreadsPage(siteURL, boardName) {
@@ -73,10 +125,6 @@ function handleApiThreadsPage(siteURL, boardName) {
     })
 }
 
-
-
-
-
 function insertThread(threadData) {
     var threadURL = `${siteURL}/${boardName}/thread/${threadId}.json`
     logger.info('processing thread: ',threadURL)
@@ -88,7 +136,6 @@ function insertThread(threadData) {
     })
     return posts
 }
-
 
 function joinApiThreadsLists (apiThreads) {
     // Join the lists from threads.json together
@@ -357,7 +404,7 @@ function updatePost(postApiData, postRow, postID, threadId) {// TODO
     // post deleted?
     deleted: (false),
     time_last_modified: postApiData.last_modified,
-    
+
     // media deleted?
     //
     }
