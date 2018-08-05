@@ -58,41 +58,49 @@ function main() {
     .catch( (err) => {
         logger.error(err)
     });
-}
+};
 
 function memCachedGrabBoard (siteURL, boardName) {
-    var threadsCache = []
-    while (true) {
-        // Process threads from the API's threads.json endpoint
-        logger.debug('Processing threads.json for board: ',boardName)
-        var threadsUrl = `${siteURL}/${boardName}/threads.json`
-        fetchApiJson(threadsUrl)
-        .then( (apiThreads) => {
-            var apiThreadPairs = joinApiThreadsLists(apiThreads)
-            // Decide which threads to grab
-            for (var i = 0; i< apiThreadPairs.length; i++){
-                var threadId = apiThreadPairs[i].no
-                var lastModified = apiThreadPairs[i].last_modified
-                var thread = getCacheThread(threadsCache, threadId)
-                // Ensure we have a Thread object to do comparisons on
-                if (! (thread) ) {
-                    logger.debug('New thread: ',threadId)
-                    thread = classes.Thread(thread_num = threadId, lastGrabbed = 0)
-                }
-                // Check if we want to update this thread
-                if (thread.lastGrabbed < lastModified) {
-                    // Grab thread
-                    logger.debug('Thread needs update: ',threadId)
-                    handleWholeThreadAtOnce(siteURL, boardName, threadId)
-                    .then( () => {
-                        thread.lastGrabbed = Date.now()
-                    })
-                } else {
-                    logger.debug('Ignoring thread: ',threadId)
-                }
+    importDbRecentThreads(5)
+    .then( (threadsCache) => {
+        logger.debug('a')
+        memCachedScanBoard(threadsCache, siteURL, boardName)
+        logger.debug('b')
+    })
+}
+  
+
+function memCachedScanBoard (threadsCache, siteURL, boardName) {
+    // Process threads from the API's threads.json endpoint
+    logger.debug('Processing threads.json for board: ',boardName)
+    var threadsUrl = `${siteURL}/${boardName}/threads.json`
+    fetchApiJson(threadsUrl)
+    .then( (apiThreads) => {
+        var apiThreadPairs = joinApiThreadsLists(apiThreads)
+        // Decide which threads to grab
+        for (var i = 0; i< apiThreadPairs.length; i++){
+            var threadId = apiThreadPairs[i].no
+            var lastModified = apiThreadPairs[i].last_modified
+            var thread = getCacheThread(threadsCache, threadId)
+            // Ensure we have a Thread object to do comparisons on
+            if (! (thread) ) {
+                logger.debug('New thread: ',threadId)
+                thread = new classes.Thread(thread_num = threadId, lastGrabbed = 0)
             }
-        })
-    }
+            // Check if we want to update this thread
+            if (thread.lastGrabbed < lastModified) {
+                // Grab thread
+                logger.debug('Thread needs update: ',threadId)
+                handleWholeThreadAtOnce(siteURL, boardName, threadId)
+                .then( () => {
+                    thread.lastGrabbed = Date.now()
+                })
+            } else {
+                logger.debug('Ignoring thread: ',threadId)
+            }
+        }
+    })
+    return threadsCache
 }
 
 function getCacheThread(threadsCache, threadId) {
@@ -106,6 +114,74 @@ function getCacheThread(threadsCache, threadId) {
     }
     return match
 }
+
+function importDbRecentThreads(numberOfRows) {
+    // Query the database for the most recent entries in the threads table,
+    // returning the resulting rows as Thread objects
+    return new Promise( function (resolve, reject) {
+        logger.debug('Loading recent threads')
+        
+        // Get recent threads
+        return db.Thread.findAll({// We want the most recent threads
+            order: ['thread_num'],
+            limit: numberOfRows,// LIMIT numberOfRows
+        })
+        .then( (threadRows) => {
+            var threadCache = []
+            logger.debug('got threadRows. threadRows=', threadRows)
+            // TODO: handle case when 0 thread rows, i.e. virgin table
+            // Instantiate Thread objects
+            for (var threadRow of threadRows) {
+                var newThread = instantiateThreadAndPostsFromDb(threadRow)// Instantiate one thread and its posts
+                threadCache.push(newThread)
+            }
+            logger.debug('importDbRecentThreads resolving. threadCache=',threadCache)
+            resolve(threadCache)
+        })
+    })
+}
+
+function instantiateThreadAndPostsFromDb(threadRow) {
+    var threadRow = threadRow
+    // Given a row from the threads table, instantiate a thread cache object for it and its posts
+    return new Promise( function (resolve, reject) {
+        var thread_num = threadRow.thread_num
+        var lastModified = threadRow.time_last
+        var thread = new classes.Thread(thread_num, lastModified)
+        // Instantiate Thread objects with values from DB
+        // SELECT posts matching thread_num
+        return db.Post.findAll(
+            {
+            where:  {
+                thread_num: threadId,
+                },
+            }
+        ).then( (postRows) => {
+            // TODO: Error on 0 post rows
+            
+            // Add posts to thread
+            return populateThreadFromBdRows(postRows, thread)
+        }).then( (thread) => {
+            resolve(thread)// Return a fully populated thread
+        })
+    })
+}
+
+function populateThreadFromBdRows (postRows, thread) {
+    // Given a thread object and set of DB rows, add the rows as posts to the thread object
+    return new Promise( function (resolve, reject) {
+        // Instantiate post objects with appropriate DB values
+        for (var postRow of postRows) {
+            // Instantiate one post and add it to the thread
+            num = postRow.num
+            post = new classes.Post(num)
+            thread.posts.push(post)
+        }
+        logger.debug('breakpoint')
+        resolve(thread)// Return a fully populated thread
+    })
+}
+
 
 function handleApiThreadsPage(siteURL, boardName) {
     // Process threads from the API's threads.json endpoint
@@ -343,7 +419,8 @@ async function handleWholeThreadAtOnce(siteURL, boardName, threadId) {
                     thread_num: threadId,
                     }
                 },
-            ).then( (postRows) => {
+            )
+            .then( (postRows) => {
                 logger.trace('postRows', postRows)
                 logger.debug('postRows.length ', postRows.length)
                 logger.debug('threadData.posts.length ', threadData.posts.length)
