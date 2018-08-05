@@ -53,134 +53,134 @@ function main() {
     .then(db.Image.sync({ force: false }))
     .then(db.Thread.sync({ force: false }))
     // Grab threads
-    // .then(handleApiThreadsPage(global_siteURL, global_boardName))
-    .then(memCachedGrabBoard(global_siteURL, global_boardName))
+    .then(handleApiThreadsPage(global_siteURL, global_boardName))
+    // .then(memCachedGrabBoard(global_siteURL, global_boardName))
     .catch( (err) => {
         logger.error(err)
     });
 };
 
-function memCachedGrabBoard (siteURL, boardName) {
-    importDbRecentThreads(5)
-    .then( (threadsCache) => {
-        logger.debug('a')
-        memCachedScanBoard(threadsCache, siteURL, boardName)
-        logger.debug('b')
-    })
-}
+// function memCachedGrabBoard (siteURL, boardName) {
+//     importDbRecentThreads(5)
+//     .then( (threadsCache) => {
+//         logger.debug('a')
+//         memCachedScanBoard(threadsCache, siteURL, boardName)
+//         logger.debug('b')
+//     })
+// }
   
 
-function memCachedScanBoard (threadsCache, siteURL, boardName) {
-    // Process threads from the API's threads.json endpoint
-    logger.debug('Processing threads.json for board: ',boardName)
-    var threadsUrl = `${siteURL}/${boardName}/threads.json`
-    fetchApiJson(threadsUrl)
-    .then( (apiThreads) => {
-        var apiThreadPairs = joinApiThreadsLists(apiThreads)
-        // Decide which threads to grab
-        for (var i = 0; i< apiThreadPairs.length; i++){
-            var threadId = apiThreadPairs[i].no
-            var lastModified = apiThreadPairs[i].last_modified
-            var thread = getCacheThread(threadsCache, threadId)
-            // Ensure we have a Thread object to do comparisons on
-            if (! (thread) ) {
-                logger.debug('New thread: ',threadId)
-                thread = new classes.Thread(thread_num = threadId, lastGrabbed = 0)
-            }
-            // Check if we want to update this thread
-            if (thread.lastGrabbed < lastModified) {
-                // Grab thread
-                logger.debug('Thread needs update: ',threadId)
-                handleWholeThreadAtOnce(siteURL, boardName, threadId)
-                .then( () => {
-                    thread.lastGrabbed = Date.now()
-                })
-            } else {
-                logger.debug('Ignoring thread: ',threadId)
-            }
-        }
-    })
-    return threadsCache
-}
+// function memCachedScanBoard (threadsCache, siteURL, boardName) {
+//     // Process threads from the API's threads.json endpoint
+//     logger.debug('Processing threads.json for board: ',boardName)
+//     var threadsUrl = `${siteURL}/${boardName}/threads.json`
+//     fetchApiJson(threadsUrl)
+//     .then( (apiThreads) => {
+//         var apiThreadPairs = joinApiThreadsLists(apiThreads)
+//         // Decide which threads to grab
+//         for (var i = 0; i< apiThreadPairs.length; i++){
+//             var threadId = apiThreadPairs[i].no
+//             var lastModified = apiThreadPairs[i].last_modified
+//             var thread = getCacheThread(threadsCache, threadId)
+//             // Ensure we have a Thread object to do comparisons on
+//             if (! (thread) ) {
+//                 logger.debug('New thread: ',threadId)
+//                 thread = new classes.Thread(thread_num = threadId, lastGrabbed = 0)
+//             }
+//             // Check if we want to update this thread
+//             if (thread.lastGrabbed < lastModified) {
+//                 // Grab thread
+//                 logger.debug('Thread needs update: ',threadId)
+//                 handleWholeThreadAtOnce(siteURL, boardName, threadId)
+//                 .then( () => {
+//                     thread.lastGrabbed = Date.now()
+//                 })
+//             } else {
+//                 logger.debug('Ignoring thread: ',threadId)
+//             }
+//         }
+//     })
+//     return threadsCache
+// }
 
-function getCacheThread(threadsCache, threadId) {
-    var match
-    for (var i = 0; i< pageThreads.length; i++){
-        thread = threadsCache[i]
-        if (thread.thread_num === threadId) {
-            match = thread
-            break
-        }
-    }
-    return match
-}
+// function getCacheThread(threadsCache, threadId) {
+//     var match
+//     for (var i = 0; i< pageThreads.length; i++){
+//         thread = threadsCache[i]
+//         if (thread.thread_num === threadId) {
+//             match = thread
+//             break
+//         }
+//     }
+//     return match
+// }
 
-function importDbRecentThreads(numberOfRows) {
-    // Query the database for the most recent entries in the threads table,
-    // returning the resulting rows as Thread objects
-    return new Promise( function (resolve, reject) {
-        logger.debug('Loading recent threads')
+// function importDbRecentThreads(numberOfRows) {
+//     // Query the database for the most recent entries in the threads table,
+//     // returning the resulting rows as Thread objects
+//     return new Promise( function (resolve, reject) {
+//         logger.debug('Loading recent threads')
         
-        // Get recent threads
-        return db.Thread.findAll({// We want the most recent threads
-            order: ['thread_num'],
-            limit: numberOfRows,// LIMIT numberOfRows
-        })
-        .then( (threadRows) => {
-            var threadCache = []
-            logger.debug('got threadRows. threadRows=', threadRows)
-            // TODO: handle case when 0 thread rows, i.e. virgin table
-            // Instantiate Thread objects
-            for (var threadRow of threadRows) {
-                var newThread = instantiateThreadAndPostsFromDb(threadRow)// Instantiate one thread and its posts
-                threadCache.push(newThread)
-            }
-            logger.debug('importDbRecentThreads resolving. threadCache=',threadCache)
-            resolve(threadCache)
-        })
-    })
-}
+//         // Get recent threads
+//         return db.Thread.findAll({// We want the most recent threads
+//             order: ['thread_num'],
+//             limit: numberOfRows,// LIMIT numberOfRows
+//         })
+//         .then( (threadRows) => {
+//             var threadCache = []
+//             logger.debug('got threadRows. threadRows=', threadRows)
+//             // TODO: handle case when 0 thread rows, i.e. virgin table
+//             // Instantiate Thread objects
+//             for (var threadRow of threadRows) {
+//                 var newThread = instantiateThreadAndPostsFromDb(threadRow)// Instantiate one thread and its posts
+//                 threadCache.push(newThread)
+//             }
+//             logger.debug('importDbRecentThreads resolving. threadCache=',threadCache)
+//             resolve(threadCache)
+//         })
+//     })
+// }
 
-function instantiateThreadAndPostsFromDb(threadRow) {
-    var threadRow = threadRow
-    // Given a row from the threads table, instantiate a thread cache object for it and its posts
-    return new Promise( function (resolve, reject) {
-        var thread_num = threadRow.thread_num
-        var lastModified = threadRow.time_last
-        var thread = new classes.Thread(thread_num, lastModified)
-        // Instantiate Thread objects with values from DB
-        // SELECT posts matching thread_num
-        return db.Post.findAll(
-            {
-            where:  {
-                thread_num: threadId,
-                },
-            }
-        ).then( (postRows) => {
-            // TODO: Error on 0 post rows
+// function instantiateThreadAndPostsFromDb(threadRow) {
+//     var threadRow = threadRow
+//     // Given a row from the threads table, instantiate a thread cache object for it and its posts
+//     return new Promise( function (resolve, reject) {
+//         var thread_num = threadRow.thread_num
+//         var lastModified = threadRow.time_last
+//         var thread = new classes.Thread(thread_num, lastModified)
+//         // Instantiate Thread objects with values from DB
+//         // SELECT posts matching thread_num
+//         return db.Post.findAll(
+//             {
+//             where:  {
+//                 thread_num: threadId,
+//                 },
+//             }
+//         ).then( (postRows) => {
+//             // TODO: Error on 0 post rows
             
-            // Add posts to thread
-            return populateThreadFromBdRows(postRows, thread)
-        }).then( (thread) => {
-            resolve(thread)// Return a fully populated thread
-        })
-    })
-}
+//             // Add posts to thread
+//             return populateThreadFromBdRows(postRows, thread)
+//         }).then( (thread) => {
+//             resolve(thread)// Return a fully populated thread
+//         })
+//     })
+// }
 
-function populateThreadFromBdRows (postRows, thread) {
-    // Given a thread object and set of DB rows, add the rows as posts to the thread object
-    return new Promise( function (resolve, reject) {
-        // Instantiate post objects with appropriate DB values
-        for (var postRow of postRows) {
-            // Instantiate one post and add it to the thread
-            num = postRow.num
-            post = new classes.Post(num)
-            thread.posts.push(post)
-        }
-        logger.debug('breakpoint')
-        resolve(thread)// Return a fully populated thread
-    })
-}
+// function populateThreadFromBdRows (postRows, thread) {
+//     // Given a thread object and set of DB rows, add the rows as posts to the thread object
+//     return new Promise( function (resolve, reject) {
+//         // Instantiate post objects with appropriate DB values
+//         for (var postRow of postRows) {
+//             // Instantiate one post and add it to the thread
+//             num = postRow.num
+//             post = new classes.Post(num)
+//             thread.posts.push(post)
+//         }
+//         logger.debug('breakpoint')
+//         resolve(thread)// Return a fully populated thread
+//     })
+// }
 
 
 function handleApiThreadsPage(siteURL, boardName) {
@@ -201,32 +201,32 @@ function handleApiThreadsPage(siteURL, boardName) {
     })
 }
 
-function insertThread(threadData) {
-    var threadURL = `${siteURL}/${boardName}/thread/${threadId}.json`
-    logger.info('processing thread: ',threadURL)
-    // Load thread API URL
-    var posts = []
-    fetchApiJson(threadURL)
-    .then( (threadData) => {
-        posts
-    })
-    return posts
-}
+// function insertThread(threadData) {
+//     var threadURL = `${siteURL}/${boardName}/thread/${threadId}.json`
+//     logger.info('processing thread: ',threadURL)
+//     // Load thread API URL
+//     var posts = []
+//     fetchApiJson(threadURL)
+//     .then( (threadData) => {
+//         posts
+//     })
+//     return posts
+// }
 
-function joinApiThreadsLists (apiThreads) {
-    // Join the lists from threads.json together
-    var output = []
-    for (var i = 0; i< apiThreads.length; i++){
-        //
-        var pageThreads = apiThreads[i].threads
-        for (var j = 0; j< pageThreads.length; j++){
-            //
-            var thread = pageThreads[j]
-            output.push(thread)
-        }
-    }
-    return output
-}
+// function joinApiThreadsLists (apiThreads) {
+//     // Join the lists from threads.json together
+//     var output = []
+//     for (var i = 0; i< apiThreads.length; i++){
+//         //
+//         var pageThreads = apiThreads[i].threads
+//         for (var j = 0; j< pageThreads.length; j++){
+//             //
+//             var thread = pageThreads[j]
+//             output.push(thread)
+//         }
+//     }
+//     return output
+// }
 
 function joinApiThreadsListsIds (apiThreads) {
     // Join the lists from threads.json together
@@ -243,16 +243,16 @@ function joinApiThreadsListsIds (apiThreads) {
     return output
 }
 
-async function handleMultipleThreadsSequentially (siteURL, boardName, threadIds) {
-    // Iterate over an array of threadIDs
-    // logger.debug('processing threads: ',threadIds)
-    for (var i = 0; i< threadIds.length; i++){
-        var threadId = threadIds[i]
-        await handleWholeThreadAtOnce(siteURL, boardName, threadId)
-    }
-    logger.debug('Finished processing threads.')
-    return
-}
+// async function handleMultipleThreadsSequentially (siteURL, boardName, threadIds) {
+//     // Iterate over an array of threadIDs
+//     // logger.debug('processing threads: ',threadIds)
+//     for (var i = 0; i< threadIds.length; i++){
+//         var threadId = threadIds[i]
+//         await handleWholeThreadAtOnce(siteURL, boardName, threadId)
+//     }
+//     logger.debug('Finished processing threads.')
+//     return
+// }
 
 async function handleMultipleThreadsSequentiallyWithMediaAlso (siteURL, boardName, threadIds) {
     // Iterate over an array of threadIDs but also process some media
@@ -359,8 +359,35 @@ function fetchApiJson(url) {
             .then( (dataString) => {
             // Decode JSON
             var decoded = JSON.parse(dataString)
-            resolve( decoded)
+            resolve(decoded)
             })
+            .error( (err) => {
+                logger.error('Cant load API page!')
+                logger.error('err = ', err)
+                logger.error('err.code = ', err.code)
+                reject(err)
+            })
+        })
+    })
+}
+
+function fetchUrl(url, attemptCoumt) {// WIP
+    // Handle netowrk hiccups and still fetch the data
+    if (attemptCount === 5) reject('fetchUrl(): Too many failed retries!')
+    attemptCoumt += 1
+    return new Promise( (resolve, reject) => {
+        rp(url)
+        .then( (data) => {
+            resolve(data)
+        })
+        .error( (err) => {
+            if (err.code === 'TODO') {
+                // Handle some known error type
+            }
+            logger.error(err)
+            logger.error('err = ', err)
+            logger.error('err.code = ',err.code)
+            fetchUrl(url, attemptCoumt)// Retry
         })
     })
 }
@@ -373,9 +400,10 @@ async function handleWholeThreadAtOnce(siteURL, boardName, threadId) {
     // Load thread API URL
     return fetchApiJson(threadURL)
     .then( (threadData) => {
+        var apiPosts = threadData.posts
         // Process thread data
         // Extract thread-level data from OP
-        var opPostData = threadData.posts[0]
+        var opPostData = apiPosts[0]
         var threadId = opPostData.no
         // Lookup threadID in the DB
         return db.Thread.findOne(
@@ -384,7 +412,8 @@ async function handleWholeThreadAtOnce(siteURL, boardName, threadId) {
                 thread_num: threadId,
                 }
             },
-        ).then( (threadRow) => {
+        )
+        .then( (threadRow) => {
             if (threadRow) {
                 logger.debug('Thread already in DB: ', threadId)
                 return
@@ -411,7 +440,8 @@ async function handleWholeThreadAtOnce(siteURL, boardName, threadId) {
                     logger.error(err)
                 })
             }
-        }).then( () => {
+        })
+        .then( () => {
             // Load existing posts from DB
             return db.Post.findAll(
                 {
@@ -427,15 +457,16 @@ async function handleWholeThreadAtOnce(siteURL, boardName, threadId) {
                 // Compare data for each post in the DB against the API
 
                 // Find posts in DB but not in API (deleted)
-                deletedPostRows = compareFindDeletedPostRows(postRows, apiPosts=threadData.posts)
+                var deletedPostRows = compareFindDeletedPostRows(postRows, apiPosts=threadData.posts)
                 logger.debug('deletedPostRows.length ', deletedPostRows.length)
                 // Insert posts in DB but not in API (deleted)
-                return np = Promise.all(deletedPostRows.map( (postRow) => {
+                Promise.all(deletedPostRows.map( (postRow) => {
                     var postID = postRow.num
                     if (postRow.deleted === 0) {
                         return markPostDeleted(postID, threadId);
                     }
-                })).then( (arrayOfResults) => {
+                }))
+                .then( (arrayOfResults) => {
                     logger.trace('np() arrayOfResults', arrayOfResults)
 
                     // Deal with posts in DB and in API (meh.)
@@ -447,7 +478,7 @@ async function handleWholeThreadAtOnce(siteURL, boardName, threadId) {
                     logger.debug('newApiPosts.length ', newApiPosts.length)
                     // logger.debug('newApiPosts ', newApiPosts)
                     // Update posts in not DB but in API (new)
-                    return dp = Promise.all(newApiPosts.map( (postRow) => {
+                    Promise.all(newApiPosts.map( (postRow) => {
                         return insertPost(postRow, threadId, boardName);
                     })).then( (arrayOfResults) => {
                         return logger.trace('dp() arrayOfResults ', arrayOfResults)
@@ -546,13 +577,13 @@ function compareFindNewApiPosts (postRows, apiPosts) {// WIP
     // Produce an array of 4ch API post objects that do not match any item in the given post DB rows
     //logger.debug('postRows, apiPosts:', postRows, apiPosts)
     // Format into object type for sorting
-    const postRowsObj = buildObjFromArray (arrayIn=postRows, itemKey='num')
-    const apiPostsObj = buildObjFromArray (arrayIn=postRows, itemKey='no')
+    const postRowsObj = buildObjFromArray(postRows, 'num')
+    const apiPostsObj = buildObjFromArray(postRows, 'no')
     // Select items that occur only apiPosts
     var newApiPosts = []
     for (var j = 0; j< apiPosts.length; j++){
         var apiPost = apiPosts[j]
-        var isMatch = isitemInobj(obj=postRowsObj, itemName=String(apiPost.no))
+        var isMatch = isitemInobj(postRowsObj, String(apiPost.no))
         if ( ! isMatch ) {
             // Add to output if does not match
             var match = apiPost
@@ -620,9 +651,9 @@ async function insertPost(postData, threadId, boardName) {
 function generateMediaFullFilepath(basePath, boardName, tim, ext) {
     // https://desu-usergeneratedcontent.xyz/desu/image/1532/60/15326055533915.jpg
     // boardName/image/1234/56/123456789.ext
-    tim = tim.toString()
-    subdir_a = tim.slice(0,3)
-    subdir_b = tim.slice(3,4)
+    var tim = tim.toString()
+    var subdir_a = tim.slice(0,3)
+    var subdir_b = tim.slice(3,4)
     var fullFilePath = `${basePath}${boardName}/image/${subdir_a}/${subdir_b}/${tim}${ext}`
     return fullFilePath
 }
@@ -630,9 +661,9 @@ function generateMediaFullFilepath(basePath, boardName, tim, ext) {
 function generateMediaThumbFilepath(basePath, boardName, tim) {
     // https://desu-usergeneratedcontent.xyz/desu/thumb/1532/60/15326055533915s.jpg
     // boardName/thumb/1234/56/123456789s.jpg
-    tim = tim.toString()
-    subdir_a = tim.slice(0,3)
-    subdir_b = tim.slice(3,4)
+    var tim = tim.toString()
+    var subdir_a = tim.slice(0,3)
+    var subdir_b = tim.slice(3,4)
     var fullFilePath = `${basePath}${boardName}/thumb/${subdir_a}/${subdir_b}/${tim}s.jpg`
     return fullFilePath
 }
@@ -649,10 +680,10 @@ function downloadApiPostMedia(postData) {//WIP
         // Decide where to save each file
         // Images: http(s)://i.4cdn.org/board/tim.ext
         var fullURL = `https://i.4cdn.org/${global_boardName}/${postData.tim}${postData.ext}`
-        var fullFilePath = generateMediaFullFilepath(basePath=global_savepath, boardName=global_boardName, tim=postData.tim, ext=postData.ext)
+        var fullFilePath = generateMediaFullFilepath(global_savepath, global_boardName, postData.tim, postData.ext)
         // Thumbnails: http(s)://i.4cdn.org/board/tims.jpg
         var thumbURL = `https://i.4cdn.org/${global_boardName}/${postData.tim}s.jpg`
-        var thumbFilePath = generateMediaThumbFilepath(basePath=global_savepath, boardName=global_boardName, tim=postData.tim)
+        var thumbFilePath = generateMediaThumbFilepath(global_savepath, global_boardName, postData.tim)
         // Save full image
         downloadMedia(fullURL, fullFilePath)
         // Save thumb
@@ -674,7 +705,6 @@ function downloadApiPostMedia(postData) {//WIP
         })
         .catch( function downloadApiPostMedia_ErrorHandler (err) {
             logger.error(err)
-            throw(err)
             reject(err)
         })
     })
@@ -687,7 +717,7 @@ function downloadMedia(url, filePath) {
     // logger.warn('Media downloading disabled!')
     // return
     // Ensure destination dir exists
-    destinationDir = path.dirname(filePath)
+    var destinationDir = path.dirname(filePath)
     fs.ensureDir(destinationDir)
     .then( () =>  {
         // Download and save file to disk
@@ -709,7 +739,7 @@ function downloadMedia(url, filePath) {
 
 function insertPostFinal (postData, threadId, mediaId) {
     // Insert the post's data
-    logger.debug('Inserting post data postData.no=',postData.no)
+    logger.debug('Inserting post data, postData.no=',postData.no)
     return db.Post.create({
         media_id: mediaId,
         poster_ip: 0,// 0 for scraped posts
