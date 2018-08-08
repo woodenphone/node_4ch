@@ -355,13 +355,15 @@ function fetchApiJson(url) {
         logger.debug('Loading API URL: ', url)
         limiter.removeTokens(1, function() {
             logger.trace('Limiter fired.')
-            rp(url)
+            // rp(url)// Old way that works but dies if any problems
+            fetchUrl(url, 0)// New way that is WIP and meant to be resistant to network trouble
             .then( (dataString) => {
             // Decode JSON
             var decoded = JSON.parse(dataString)
             resolve(decoded)
             })
-            .error( (err) => {
+            .catch( (err) => {
+                // Log the error and pass it on
                 logger.error('Cant load API page!')
                 logger.error('err = ', err)
                 logger.error('err.code = ', err.code)
@@ -371,26 +373,37 @@ function fetchApiJson(url) {
     })
 }
 
-function fetchUrl(url, attemptCoumt) {// WIP
+function fetchUrl(url, attemptCount) {// WIP
     // Handle netowrk hiccups and still fetch the data
-    if (attemptCount === 5) reject('fetchUrl(): Too many failed retries!')
-    attemptCoumt += 1
+    var retryLimiter = new RateLimiter(1, 5000, true);// numberOfTokens, milliseconds, fireImmediately // Make retries wait
     return new Promise( (resolve, reject) => {
-        rp(url)
-        .then( (data) => {
-            resolve(data)
-        })
-        .error( (err) => {
-            if (err.code === 'TODO') {
-                // Handle some known error type
-            }
-            logger.error(err)
-            logger.error('err = ', err)
-            logger.error('err.code = ',err.code)
-            fetchUrl(url, attemptCoumt)// Retry
+        attemptCount += 1
+        if (attemptCount > 0) { logger.debug('Retrying. url = ', url, '; attemptCount = ', attemptCount)}
+        if (attemptCount === 5) reject('fetchUrl(): Too many failed retries! url = ', url)
+        retryLimiter.removeTokens(1, function() {// Make retries wait
+            rp(url)
+            .then( (data) => {
+                resolve(data)
+            })
+            .catch( (err) => {
+                if (err.name === 'RequestError') {
+                    // Handle some known error type
+                    logger.error('Handling RequestError by retrying. err = ', err)
+                    retryData = fetchUrl(url, attemptCount)// Retry
+                    logger.debug('retryData =', retryData)
+                    resolve(retryData)
+                } // TODO: Handle more error types in better ways
+                // Log the error and pass it on
+                logger.error(err)
+                logger.error('err = ', err)
+                logger.error('err.cause.code = ',err.cause.code)
+                reject(err)
+                // fetchUrl(url, attemptCount)// Retry
+            })
         })
     })
 }
+
 
 async function handleWholeThreadAtOnce(siteURL, boardName, threadId) {
     // Load a thread from the API; lookup all its posts at once; insert new posts; update existing posts
